@@ -1,0 +1,47 @@
+{
+    "name": "PASCAL NDVI Block",
+    "version": "1.0.3",
+    "description": "CLI tool for satellite image processing to calculate NDVI, NDRE and SAVI with ISO 42001 traceability",
+    "interfaces": {
+        "input": {
+            "raster": {
+                "type": "GeoTIFF",
+                "bands": ["RED", "NIR"],
+                "validation": {
+                    "required": true,
+                    "format": ["*.tif", "*.tiff"]
+                }
+            },
+            "parameters": {
+                "index": {
+                    "type": "string",
+                    "enum": ["ndvi", "savi"],
+                    "default": "ndvi"
+                },
+                "L": {
+                    "type": "number",
+                    "description": "Soil brightness correction factor for SAVI",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "default": 0.5
+                }
+            }
+        },
+        "output": {
+            "raster": {
+                "type": "GeoTIFF",
+                "bands": ["INDEX"],
+                "validation": {
+                    "format": "*.tif"
+                }
+            },
+            "log": {
+                "type": "file",
+                "format": "*.log",
+                "validation": {
+                    "schema": "ISO42001"
+                }
+            }
+        }
+    }
+}

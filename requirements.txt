@@ -1,0 +1,28 @@
+# Dependencias principales
+typer
+rasterio
+geopandas
+shapely
+loguru
+numpy
+
+# Dependencias de desarrollo y testing
+pytest>=7.0.0
+pytest-cov
+coverage
+flake8
+black
+mypy
+types-geopandas
+#python-type-stubs
+pydocstyle
+bandit
+safety
+build
+twine
+setuptools>=45
+wheel
+
+# Tipos para verificación estática
+types-setuptools
+types-python-dateutil

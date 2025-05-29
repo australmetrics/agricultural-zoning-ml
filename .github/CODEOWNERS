@@ -1,0 +1,21 @@
+# Global code owners
+* @robmeseng
+
+# Documentation owners
+/docs/         @robmeseng
+/docs-private/ @robmeseng
+
+# Core functionality
+/src/   @robmeseng
+/tests/ @robmeseng
+
+# Configuration and metadata
+*.toml @robmeseng
+*.json @robmeseng
+*.yml  @robmeseng
+
+# Compliance and security
+/docs/compliance/    @robmeseng
+/SECURITY.md         @robmeseng
+/CODE_OF_CONDUCT.md  @robmeseng
+

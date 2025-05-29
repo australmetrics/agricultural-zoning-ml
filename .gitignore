@@ -1,0 +1,51 @@
+# Python generated files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Test coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cache directories
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.env
+*.env
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+
+# Generated files
+results/
+logs/
+*.log
+*.sha256
+
+# Data files (optional, depending on versioning needs)
+data/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Confidential files
+docs-private/

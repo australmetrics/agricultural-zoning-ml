@@ -1,0 +1,180 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "PASCAL NDVI Block Manifest",
+    "type": "object",
+    "required": ["name", "version", "description", "interfaces"],
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "The name of the block"
+        },
+        "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "description": "Semantic version of the block"
+        },
+        "description": {
+            "type": "string",
+            "description": "Brief description of the block's functionality"
+        },
+        "interfaces": {
+            "type": "object",
+            "required": ["input", "output"],
+            "properties": {
+                "input": {
+                    "type": "object",
+                    "required": ["raster", "parameters"],
+                    "properties": {
+                        "raster": {
+                            "type": "object",
+                            "required": ["type", "bands", "validation"],
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["GeoTIFF"]
+                                },
+                                "bands": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "enum": ["RED", "NIR"]
+                                    },
+                                    "minItems": 2,
+                                    "maxItems": 2
+                                },
+                                "validation": {
+                                    "type": "object",
+                                    "required": ["required", "format"],
+                                    "properties": {
+                                        "required": {
+                                            "type": "boolean"
+                                        },
+                                        "format": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "pattern": "^\\*\\.tiff?$"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "parameters": {
+                            "type": "object",
+                            "required": ["index", "L"],
+                            "properties": {
+                                "index": {
+                                    "type": "object",
+                                    "required": ["type", "enum", "default"],
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "enum": ["string"]
+                                        },
+                                        "enum": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "enum": ["ndvi", "savi"]
+                                            }
+                                        },
+                                        "default": {
+                                            "type": "string",
+                                            "enum": ["ndvi"]
+                                        }
+                                    }
+                                },
+                                "L": {
+                                    "type": "object",
+                                    "required": ["type", "description", "minimum", "maximum", "default"],
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "enum": ["number"]
+                                        },
+                                        "description": {
+                                            "type": "string"
+                                        },
+                                        "minimum": {
+                                            "type": "number",
+                                            "minimum": 0
+                                        },
+                                        "maximum": {
+                                            "type": "number",
+                                            "maximum": 1
+                                        },
+                                        "default": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "output": {
+                    "type": "object",
+                    "required": ["raster", "log"],
+                    "properties": {
+                        "raster": {
+                            "type": "object",
+                            "required": ["type", "bands", "validation"],
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["GeoTIFF"]
+                                },
+                                "bands": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "enum": ["INDEX"]
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 1
+                                },
+                                "validation": {
+                                    "type": "object",
+                                    "required": ["format"],
+                                    "properties": {
+                                        "format": {
+                                            "type": "string",
+                                            "pattern": "^\\*\\.tif$"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "log": {
+                            "type": "object",
+                            "required": ["type", "format", "validation"],
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["file"]
+                                },
+                                "format": {
+                                    "type": "string",
+                                    "pattern": "^\\*\\.log$"
+                                },
+                                "validation": {
+                                    "type": "object",
+                                    "required": ["schema"],
+                                    "properties": {
+                                        "schema": {
+                                            "type": "string",
+                                            "enum": ["ISO42001"]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

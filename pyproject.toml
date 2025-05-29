@@ -1,0 +1,45 @@
+[project]
+name = "pascal-ndvi-block"
+version = "1.0.3"
+description = "High-performance NDVI/SAVI/NDRE with ISO 42001 compliance"
+readme = "README.md"
+authors = [
+  { name = "AustralMetrics SpA", email = "info@australmetrics.cl" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+  "typer",
+  "rasterio",
+  "geopandas",
+  "shapely",
+  "loguru",
+  "numpy",
+]
+
+[project.urls]
+Homepage = "https://github.com/australmetrics/pascal-ndvi-block"
+Repository = "https://github.com/australmetrics/pascal-ndvi-block.git"
+Issues = "https://github.com/australmetrics/pascal-ndvi-block/issues"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
