@@ -22,16 +22,15 @@ from pascal_zoning.zoning import (
 # --------------------------- FIXTURES ------------------------------ #
 # ------------------------------------------------------------------ #
 
+
 @pytest.fixture
 def synthetic_indices_2x2():
     """
     Diccionario de índices 2×2.  Usa nombres en MAYÚSCULAS
     porque zoning.py espera 'NDVI', 'NDRE', etc.
     """
-    ndvi = np.array([[0.1,  0.2],
-                     [0.3,  0.4]], dtype=float)
-    ndre = np.array([[-0.1, -0.2],
-                     [-0.3, -0.4]], dtype=float)
+    ndvi = np.array([[0.1, 0.2], [0.3, 0.4]], dtype=float)
+    ndre = np.array([[-0.1, -0.2], [-0.3, -0.4]], dtype=float)
     return {"NDVI": ndvi, "NDRE": ndre}
 
 
@@ -44,6 +43,7 @@ def bounds_polygon():
 # ------------------------------------------------------------------ #
 # --------------------------- PRUEBAS ------------------------------- #
 # ------------------------------------------------------------------ #
+
 
 def test_run_pipeline_basic(synthetic_indices_2x2, bounds_polygon, tmp_path):
     """
@@ -62,7 +62,7 @@ def test_run_pipeline_basic(synthetic_indices_2x2, bounds_polygon, tmp_path):
         bounds=bounds_polygon,
         points_per_zone=2,
         crs="EPSG:32719",
-        force_k=2,               # k fijo para reproducibilidad
+        force_k=2,  # k fijo para reproducibilidad
     )
 
     # ------------- estructuras de salida ------------- #
@@ -79,7 +79,7 @@ def test_run_pipeline_basic(synthetic_indices_2x2, bounds_polygon, tmp_path):
 
     # ------------- estadísticas de zona -------------- #
     assert isinstance(result.stats, list)
-    assert len(result.stats) == 2          # k=2 ⇒ dos zonas
+    assert len(result.stats) == 2  # k=2 ⇒ dos zonas
     for st in result.stats:
         assert isinstance(st, ZoneStats)
         assert st.area_ha > 0.0
@@ -137,7 +137,3 @@ def test_files_are_created(tmp_path, bounds_polygon, synthetic_indices_2x2):
     }
     produced = {p.name for p in tmp_path.iterdir()}
     assert expected.issubset(produced), f"Faltan archivos: {expected - produced}"
-
-
-
-

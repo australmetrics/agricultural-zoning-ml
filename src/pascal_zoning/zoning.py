@@ -40,6 +40,7 @@ GeometryType = Union[Polygon, Point, BaseGeometry]
 @dataclass
 class ClusterMetrics:
     """Métricas de calidad del clustering."""
+
     n_clusters: int
     silhouette: float
     calinski_harabasz: float
@@ -51,6 +52,7 @@ class ClusterMetrics:
 @dataclass
 class ZoneStats:
     """Estadísticas por zona de manejo."""
+
     zone_id: int
     area_ha: float
     perimeter_m: float
@@ -62,6 +64,7 @@ class ZoneStats:
 @dataclass
 class ZoningResult:
     """Resultados completos de la zonificación."""
+
     zones: gpd.GeoDataFrame
     samples: gpd.GeoDataFrame
     metrics: ClusterMetrics
@@ -70,22 +73,26 @@ class ZoningResult:
 
 class ZonificationError(Exception):
     """Excepción base para errores de zonificación."""
+
     pass
 
 
 class ValidationError(ZonificationError):
     """Error en validación de índices espectrales."""
+
     pass
 
 
 class ProcessingError(ZonificationError):
     """Error durante procesamiento (p. ej. no hay píxeles válidos o filtrado)."""
+
     pass
 
 
 # ------------------------------------------------------------- #
 # ## Clase principal de zonificación
 # ------------------------------------------------------------- #
+
 
 class AgriculturalZoning:
     """
@@ -97,12 +104,13 @@ class AgriculturalZoning:
       3. Generación de puntos de muestreo optimizados por inhibición.
       4. Cálculo de métricas de clustering y estadísticas por zona.
     """
+
     def __init__(
         self,
         random_state: int = 42,
         min_zone_size_ha: float = 0.5,
         max_zones: int = 10,
-        output_dir: Optional[Path] = None
+        output_dir: Optional[Path] = None,
     ):
         """
         Initialize an Agricultural Zoning instance.
@@ -180,40 +188,46 @@ class AgriculturalZoning:
             geometries=polygon_geom,
             out_shape=(self.height, self.width),
             transform=self.transform,
-            invert=True
+            invert=True,
         )
 
         # Máscara de píxeles donde todos los índices NO sean NaN
         if not self.indices:
             raise ProcessingError("No hay índices inicializados")
-            
+
         # Diagnóstico de valores NaN por índice
         for name, array in self.indices.items():
             nan_count = np.sum(np.isnan(array))
             if nan_count > 0:
-                self.logger.warning(f"Índice {name}: {nan_count} valores NaN detectados")
-        
+                self.logger.warning(
+                    f"Índice {name}: {nan_count} valores NaN detectados"
+                )
+
         stacked = np.stack(list(self.indices.values()), axis=-1)
         valid_data_mask = np.all(~np.isnan(stacked), axis=-1)
 
         # Máscara final: dentro del polígono y sin NaNs
         self.valid_mask = np.logical_and(mask_poly, valid_data_mask)
-        
+
         if self.valid_mask is None:
             raise ProcessingError("valid_mask no fue asignada correctamente")
-            
+
         n_valid = int(np.sum(self.valid_mask))
         n_poly = int(np.sum(mask_poly))
         n_data = int(np.sum(valid_data_mask))
-        
+
         self.logger.info(f"Píxeles dentro del polígono: {n_poly}")
         self.logger.info(f"Píxeles con datos válidos: {n_data}")
         self.logger.info(f"Píxeles válidos final: {n_valid}")
-        
+
         if n_valid == 0:
-            raise ProcessingError("No se encontraron píxeles válidos dentro del polígono.")
+            raise ProcessingError(
+                "No se encontraron píxeles válidos dentro del polígono."
+            )
         elif n_valid < n_poly:
-            self.logger.warning(f"Se descartaron {n_poly - n_valid} píxeles por tener datos inválidos")
+            self.logger.warning(
+                f"Se descartaron {n_poly - n_valid} píxeles por tener datos inválidos"
+            )
 
     def prepare_feature_matrix(self) -> None:
         """
@@ -238,7 +252,9 @@ class AgriculturalZoning:
         X_scaled = self.scaler.fit_transform(X_imputed)
 
         self.features_array = np.array(X_scaled, dtype=np.float64)
-        self.logger.info("Matriz de características imputada y escalada para clustering.")
+        self.logger.info(
+            "Matriz de características imputada y escalada para clustering."
+        )
 
     def select_optimal_clusters(self) -> int:
         """
@@ -267,9 +283,11 @@ class AgriculturalZoning:
                 best_score = sil_score
                 best_k = k
 
-        self.logger.info(f"Seleccionado k óptimo = {best_k} con Silhouette = {best_score:.4f}")
-        return best_k    
-    
+        self.logger.info(
+            f"Seleccionado k óptimo = {best_k} con Silhouette = {best_score:.4f}"
+        )
+        return best_k
+
     def perform_clustering(self, force_k: Optional[int] = None) -> None:
         """
         Ejecuta KMeans con el número óptimo de clusters o un k forzado.
@@ -286,7 +304,9 @@ class AgriculturalZoning:
         else:
             self.n_clusters_opt = self.select_optimal_clusters()
 
-        kmeans_final = KMeans(n_clusters=self.n_clusters_opt, random_state=self.random_state)
+        kmeans_final = KMeans(
+            n_clusters=self.n_clusters_opt, random_state=self.random_state
+        )
         labels_flat = kmeans_final.fit_predict(self.features_array)
 
         # Reconstruir mapa de clusters
@@ -295,12 +315,12 @@ class AgriculturalZoning:
 
         # Crear array con -1 como valor por defecto para píxeles fuera del polígono
         clusters_img = np.full((self.height, self.width), -1, dtype=np.int32)
-            
+
         # Asignar las etiquetas solo en los píxeles válidos
         if self.valid_mask is not None:
             valid_mask_array = np.asarray(self.valid_mask, dtype=bool)
             clusters_img[valid_mask_array] = labels_flat
-                
+
         # Convertir a float64 para mantener consistencia de tipos
         self.cluster_labels = clusters_img.astype(np.float64)
 
@@ -313,7 +333,9 @@ class AgriculturalZoning:
         self.logger.info(f"Píxeles con etiqueta: {labeled_pixels}")
 
         if labeled_pixels < valid_pixels:
-            self.logger.warning(f"Hay {valid_pixels - labeled_pixels} píxeles válidos sin etiqueta")
+            self.logger.warning(
+                f"Hay {valid_pixels - labeled_pixels} píxeles válidos sin etiqueta"
+            )
 
         # Calcular métricas de calidad
         inertia = float(kmeans_final.inertia_)
@@ -330,10 +352,12 @@ class AgriculturalZoning:
             calinski_harabasz=ch_score,
             inertia=inertia,
             cluster_sizes=cluster_sizes,
-            timestamp=timestamp
+            timestamp=timestamp,
         )
         self.logger.info(f"Clustering final completo: {self.n_clusters_opt} clusters.")
-        self.logger.info(f"Métricas: Silhouette={sil_score:.4f}, CH={ch_score:.2f}, Inertia={inertia:.2f}")
+        self.logger.info(
+            f"Métricas: Silhouette={sil_score:.4f}, CH={ch_score:.2f}, Inertia={inertia:.2f}"
+        )
 
     def extract_zone_polygons(self) -> None:
         """
@@ -362,46 +386,51 @@ class AgriculturalZoning:
                 y0 = top - row * y_res
                 x1 = x0 + x_res
                 y1 = y0 - y_res
-                poly = Polygon([
-                    (x0, y0),
-                    (x1, y0),
-                    (x1, y1),
-                    (x0, y1)
-                ])
+                poly = Polygon([(x0, y0), (x1, y0), (x1, y1), (x0, y1)])
                 records.append({"cluster": label, "geometry": poly})
 
         if not records:
-            raise ProcessingError("No se generaron polígonos de zonas (sin píxeles con clusters).")
+            raise ProcessingError(
+                "No se generaron polígonos de zonas (sin píxeles con clusters)."
+            )
 
         gdf_pixels = gpd.GeoDataFrame(records, crs=self.crs)
         self.zones_gdf = gdf_pixels.dissolve(by="cluster").reset_index()
-        self.logger.info("Polígonos de zona extraídos y disueltos por cluster.") 
+        self.logger.info("Polígonos de zona extraídos y disueltos por cluster.")
 
     def filter_small_zones(self) -> None:
         """
         Filtra zonas cuyo área sea menor a min_zone_size_ha y reasigna índices.
         """
         if self.zones_gdf is None:
-            raise ProcessingError("Zonas no generadas; ejecutar extract_zone_polygons primero.")
+            raise ProcessingError(
+                "Zonas no generadas; ejecutar extract_zone_polygons primero."
+            )
 
         self.zones_gdf["area_m2"] = self.zones_gdf.geometry.area
         self.zones_gdf["area_ha"] = self.zones_gdf["area_m2"] / 10000.0
 
         initial_count = len(self.zones_gdf)
-        self.zones_gdf = self.zones_gdf[self.zones_gdf["area_ha"] >= self.min_zone_size_ha].copy()
+        self.zones_gdf = self.zones_gdf[
+            self.zones_gdf["area_ha"] >= self.min_zone_size_ha
+        ].copy()
         filtered_count = len(self.zones_gdf)
-        self.logger.info(f"Zonas totales antes del filtrado: {initial_count}. Después: {filtered_count}.")
+        self.logger.info(
+            f"Zonas totales antes del filtrado: {initial_count}. Después: {filtered_count}."
+        )
 
         # Actualizar etiquetas de cluster y asegurarse que sean consecutivas
         self.zones_gdf = self.zones_gdf.reset_index(drop=True)
         self.zones_gdf["cluster"] = self.zones_gdf.index.astype(int)
-        
+
         # Si quedan zonas sin asignar, asignarlas a la zona más cercana
         if self.cluster_labels is not None:
             valid_labels = set(self.zones_gdf["cluster"].values)
             mask_unassigned = ~np.isin(self.cluster_labels, list(valid_labels))
             if np.any(mask_unassigned):
-                self.logger.warning(f"Reasignando {np.sum(mask_unassigned)} píxeles a zonas cercanas")
+                self.logger.warning(
+                    f"Reasignando {np.sum(mask_unassigned)} píxeles a zonas cercanas"
+                )
 
     def _pixel_to_world_coords(self, pixels: np.ndarray) -> np.ndarray:
         """
@@ -444,7 +473,7 @@ class AgriculturalZoning:
         samples_list: list[dict[str, Any]] = []
 
         for zone_id in self.zones_gdf["cluster"]:
-            zone_mask = (self.cluster_labels == int(zone_id))
+            zone_mask = self.cluster_labels == int(zone_id)
             if not np.any(zone_mask):
                 continue
 
@@ -464,15 +493,19 @@ class AgriculturalZoning:
                 remaining_idxs = np.arange(xs.size)
                 first = int(np.random.choice(remaining_idxs))
                 selected_idxs.append(first)
-                remaining_idxs = np.delete(remaining_idxs, np.where(remaining_idxs == first))
+                remaining_idxs = np.delete(
+                    remaining_idxs, np.where(remaining_idxs == first)
+                )
 
                 while len(selected_idxs) < n_points and remaining_idxs.size > 0:
                     sel_coords = world_coords[selected_idxs]
                     rem_coords = world_coords[remaining_idxs]
                     # Distancia mínima
                     min_dists = np.min(
-                        np.linalg.norm(rem_coords[:, None, :] - sel_coords[None, :, :], axis=2),
-                        axis=1
+                        np.linalg.norm(
+                            rem_coords[:, None, :] - sel_coords[None, :, :], axis=2
+                        ),
+                        axis=1,
                     )
                     best_idx_in_rem = int(np.argmax(min_dists))
                     best_idx = remaining_idxs[best_idx_in_rem]
@@ -487,11 +520,9 @@ class AgriculturalZoning:
                     name: float(array[int(py), int(px)])
                     for name, array in self.indices.items()
                 }
-                samples_list.append({
-                    "geometry": point,
-                    "cluster": int(zone_id),
-                    **values
-                })
+                samples_list.append(
+                    {"geometry": point, "cluster": int(zone_id), **values}
+                )
 
         if not samples_list:
             raise ProcessingError("No se generaron puntos de muestreo en ninguna zona.")
@@ -517,9 +548,13 @@ class AgriculturalZoning:
             area_m2 = geom.area
             area_ha = area_m2 / 10000.0
             perimeter_m = geom.length
-            compactness = 4 * np.pi * area_m2 / (perimeter_m * perimeter_m) if perimeter_m > 0 else 0.0
+            compactness = (
+                4 * np.pi * area_m2 / (perimeter_m * perimeter_m)
+                if perimeter_m > 0
+                else 0.0
+            )
 
-            zone_mask = (self.cluster_labels == zone_id)
+            zone_mask = self.cluster_labels == zone_id
             mean_values: dict[str, float] = {}
             std_values: dict[str, float] = {}
             for name, array in self.indices.items():
@@ -533,7 +568,7 @@ class AgriculturalZoning:
                 perimeter_m=perimeter_m,
                 compactness=compactness,
                 mean_values=mean_values,
-                std_values=std_values
+                std_values=std_values,
             )
             self.zone_stats.append(stats)
 
@@ -549,7 +584,9 @@ class AgriculturalZoning:
         """
         save_dir = output_dir or self.output_dir
         if save_dir is None:
-            self.logger.warning("No se especificó directorio de salida; no se guardarán resultados.")
+            self.logger.warning(
+                "No se especificó directorio de salida; no se guardarán resultados."
+            )
             return
 
         save_dir = Path(save_dir)
@@ -575,7 +612,7 @@ class AgriculturalZoning:
                     "zone_id": stat.zone_id,
                     "area_ha": stat.area_ha,
                     "perimeter_m": stat.perimeter_m,
-                    "compactness": stat.compactness
+                    "compactness": stat.compactness,
                 }
                 for idx_name, val in stat.mean_values.items():
                     row[f"{idx_name}_mean"] = val
@@ -596,7 +633,7 @@ class AgriculturalZoning:
                 "calinski_harabasz": float(self.metrics.calinski_harabasz),
                 "inertia": float(self.metrics.inertia),
                 "cluster_sizes": self.metrics.cluster_sizes,
-                "timestamp": self.metrics.timestamp
+                "timestamp": self.metrics.timestamp,
             }
             metrics_fp = save_dir / "metricas_clustering.json"
             with open(metrics_fp, "w") as f:
@@ -618,24 +655,35 @@ class AgriculturalZoning:
         try:
             # 1) Mapa de NDVI
             if "NDVI" not in self.indices:
-                self.logger.warning("No se encontró índice NDVI; no se generará mapa NDVI.")
+                self.logger.warning(
+                    "No se encontró índice NDVI; no se generará mapa NDVI."
+                )
             else:
                 ndvi = self.indices["NDVI"]
                 if self.valid_mask is None:
-                    raise ProcessingError("Máscara de validez no inicializada para visualización.")
+                    raise ProcessingError(
+                        "Máscara de validez no inicializada para visualización."
+                    )
                 if self.bounds is None:
                     raise ProcessingError("Bounds no inicializados para visualización.")
-                
+
                 ndvi_masked = np.where(self.valid_mask, ndvi, np.nan)
                 left, bottom, right, top = self.bounds.bounds
                 x_margin = (right - left) * 0.05
                 y_margin = (top - bottom) * 0.05
-                extent = (left - x_margin, right + x_margin, bottom - y_margin, top + y_margin)
+                extent = (
+                    left - x_margin,
+                    right + x_margin,
+                    bottom - y_margin,
+                    top + y_margin,
+                )
 
                 fig1, ax1 = plt.subplots(figsize=(10, 10))
                 cmap_ndvi = plt.get_cmap("RdYlGn").copy()
                 cmap_ndvi.set_bad(color="white")
-                im = ax1.imshow(ndvi_masked, cmap=cmap_ndvi, extent=extent, origin="upper")
+                im = ax1.imshow(
+                    ndvi_masked, cmap=cmap_ndvi, extent=extent, origin="upper"
+                )
                 ax1.set_title("Mapa de NDVI", fontsize=16, pad=15)
                 ax1.set_xticks([])
                 ax1.set_yticks([])
@@ -647,9 +695,11 @@ class AgriculturalZoning:
                 plt.tight_layout()
                 ndvi_fp = self.output_dir / "mapa_ndvi.png"
                 ndvi_fp.parent.mkdir(parents=True, exist_ok=True)
-                plt.savefig(ndvi_fp, dpi=500, bbox_inches='tight')
+                plt.savefig(ndvi_fp, dpi=500, bbox_inches="tight")
                 plt.close(fig1)
-                self.logger.info(f"Mapa de NDVI guardado en: {ndvi_fp}")            # 2) Mapa de Zonificación
+                self.logger.info(
+                    f"Mapa de NDVI guardado en: {ndvi_fp}"
+                )  # 2) Mapa de Zonificación
             if self.zones_gdf is not None and not self.zones_gdf.empty:
                 fig2, ax2 = plt.subplots(figsize=(10, 10))
                 self.zones_gdf.plot(
@@ -667,7 +717,7 @@ class AgriculturalZoning:
                 sm.set_array([])
                 cbar = plt.colorbar(sm, ax=ax2, fraction=0.036, pad=0.04)
                 cbar.set_label("Cluster", rotation=270, labelpad=15, fontsize=12)
-                
+
                 ax2.set_title("Zonificación por Clusters", fontsize=16, pad=15)
                 ax2.set_xticks([])
                 ax2.set_yticks([])
@@ -678,14 +728,14 @@ class AgriculturalZoning:
                 plt.tight_layout()
                 clusters_fp = self.output_dir / "mapa_clusters.png"
                 clusters_fp.parent.mkdir(parents=True, exist_ok=True)
-                plt.savefig(clusters_fp, dpi=500, bbox_inches='tight')
+                plt.savefig(clusters_fp, dpi=500, bbox_inches="tight")
                 plt.close(fig2)
                 self.logger.info(f"Mapa de clusters guardado en: {clusters_fp}")
 
         except Exception as e:
             self.logger.error(f"Error generando visualizaciones: {str(e)}")
             # Cerrar todas las figuras por si acaso
-            plt.close('all')    
+            plt.close("all")
 
     def run_pipeline(
         self,
@@ -695,7 +745,7 @@ class AgriculturalZoning:
         crs: str,
         force_k: Optional[int] = None,
         min_zone_size_ha: Optional[float] = None,
-        output_dir: Optional[Path] = None
+        output_dir: Optional[Path] = None,
     ) -> ZoningResult:
         """
         Ejecuta el pipeline completo de zonificación.
@@ -725,10 +775,7 @@ class AgriculturalZoning:
         left, bottom, right, top = bounds.bounds
         pixel_width = (right - left) / float(self.width)
         pixel_height = (top - bottom) / float(self.height)
-        self.transform = Affine.from_gdal(
-            left, pixel_width, 0,
-            top, 0, -pixel_height
-        )
+        self.transform = Affine.from_gdal(left, pixel_width, 0, top, 0, -pixel_height)
 
         # Crear GeoDataFrame del polígono
         self.gdf_predio = gpd.GeoDataFrame({"geometry": [bounds]}, crs=crs)
@@ -756,7 +803,7 @@ class AgriculturalZoning:
             zones=self.zones_gdf,
             samples=self.samples_gdf,
             metrics=self.metrics,
-            stats=self.zone_stats
+            stats=self.zone_stats,
         )
 
 
@@ -774,31 +821,31 @@ if __name__ == "__main__":
         "--raster",
         type=str,
         required=True,
-        help="Ruta al TIFF recortado del predio (EPSG:32718)."
+        help="Ruta al TIFF recortado del predio (EPSG:32718).",
     )
     parser.add_argument(
         "--output",
         type=str,
         default="output_zonification",
-        help="Carpeta de salida para resultados (por defecto: output_zonification)."
+        help="Carpeta de salida para resultados (por defecto: output_zonification).",
     )
     parser.add_argument(
         "--max_clusters",
         type=int,
         default=10,
-        help="Número máximo de clusters a evaluar para selección automática (por defecto: 10)."
+        help="Número máximo de clusters a evaluar para selección automática (por defecto: 10).",
     )
     parser.add_argument(
         "--min_area_ha",
         type=float,
         default=0.5,
-        help="Área mínima en hectáreas para conservar una zona (por defecto: 0.5)."
+        help="Área mínima en hectáreas para conservar una zona (por defecto: 0.5).",
     )
     parser.add_argument(
         "--force_k",
         type=int,
         default=None,
-        help="Si se especifica, fuerza ese número de clusters."
+        help="Si se especifica, fuerza ese número de clusters.",
     )
 
     args = parser.parse_args()
@@ -811,13 +858,15 @@ if __name__ == "__main__":
     # 1) Leer TIFF y calcular índices espectrales
     with rasterio.open(args.raster) as src:
         crs = src.crs.to_string() if src.crs is not None else ""
-        img = src.read()  # [B11, B8, B5, B4, B3, B2]    # Extraer y convertir bandas a float64
+        img = (
+            src.read()
+        )  # [B11, B8, B5, B4, B3, B2]    # Extraer y convertir bandas a float64
     bands = {
-        'swir': img[0].astype(np.float64),      # B11
-        'nir': img[1].astype(np.float64),       # B8
-        'red_edge': img[2].astype(np.float64),  # B5
-        'red': img[3].astype(np.float64),       # B4
-        'green': img[4].astype(np.float64)      # B3
+        "swir": img[0].astype(np.float64),  # B11
+        "nir": img[1].astype(np.float64),  # B8
+        "red_edge": img[2].astype(np.float64),  # B5
+        "red": img[3].astype(np.float64),  # B4
+        "green": img[4].astype(np.float64),  # B3
     }
 
     def safe_divide(a: FloatArray, b: FloatArray) -> FloatArray:
@@ -831,19 +880,19 @@ if __name__ == "__main__":
         Returns:
             FloatArray con índice normalizado (a-b)/(a+b)
         """
-        with np.errstate(divide='ignore', invalid='ignore'):
-            result = np.divide(a - b, a + b, 
-                             out=np.zeros_like(a, dtype=np.float64), 
-                             where=(a + b) != 0)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            result = np.divide(
+                a - b, a + b, out=np.zeros_like(a, dtype=np.float64), where=(a + b) != 0
+            )
             result = np.nan_to_num(result, nan=0.0)
         return result
 
     # Calcular índices espectrales
     indices_dict: Dict[str, FloatArray] = {
-        "NDVI": safe_divide(bands['nir'], bands['red']),
-        "NDWI": safe_divide(bands['green'], bands['nir']),
-        "NDRE": safe_divide(bands['nir'], bands['red_edge']),
-        "SI":   safe_divide(bands['swir'], bands['nir'])
+        "NDVI": safe_divide(bands["nir"], bands["red"]),
+        "NDWI": safe_divide(bands["green"], bands["nir"]),
+        "NDRE": safe_divide(bands["nir"], bands["red_edge"]),
+        "SI": safe_divide(bands["swir"], bands["nir"]),
     }
 
     # 2) Derivar el polígono del predio a partir del TIFF, forzando que 0 = fondo/nodata
@@ -858,23 +907,26 @@ if __name__ == "__main__":
 
         # Extraer los contornos de “1” en mask_valid
         geoms = []
-        for geom_geojson, val in shapes(mask_valid, mask=mask_valid, transform=transform):
+        for geom_geojson, val in shapes(
+            mask_valid, mask=mask_valid, transform=transform
+        ):
             if val == 1:
                 geoms.append(shape_from_geojson(geom_geojson))
 
         if not geoms:
-            raise ProcessingError("No se pudo derivar polígono: todos los píxeles están en 0.")
+            raise ProcessingError(
+                "No se pudo derivar polígono: todos los píxeles están en 0."
+            )
 
         # Unir todos los pedazos en un único polígono
         poly = unary_union(geoms)
-
 
     # 3) Ejecutar zonificación
     engine = AgriculturalZoning(
         random_state=42,
         min_zone_size_ha=args.min_area_ha,
         max_zones=args.max_clusters,
-        output_dir=Path(args.output)
+        output_dir=Path(args.output),
     )
 
     result = engine.run_pipeline(
@@ -883,7 +935,7 @@ if __name__ == "__main__":
         points_per_zone=10,  # o usa args.min_area_ha si deseas
         crs=crs,
         force_k=args.force_k,
-        output_dir=Path(args.output)
+        output_dir=Path(args.output),
     )
 
     # 4) Mostrar resumen por consola
@@ -901,13 +953,3 @@ if __name__ == "__main__":
             f"Perímetro={stat.perimeter_m:.2f} m, Compacidad={stat.compactness:.4f}, "
             f"Media NDVI={stat.mean_values['NDVI']:.4f}, Std NDVI={stat.std_values['NDVI']:.4f}"
         )
-
-
-
-
-
-
-
-
-
-

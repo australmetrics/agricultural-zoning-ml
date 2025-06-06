@@ -3,9 +3,10 @@ Logging estructurado ISO-42001 para Agri-Zoning.
 """
 
 from loguru import logger
-import sys                    # ← Importar sys directamente
+import sys  # ← Importar sys directamente
 from pathlib import Path
 from datetime import datetime
+
 
 def setup_logging(output_dir: Path) -> None:
     log_dir = Path(output_dir) / "logs"
@@ -30,5 +31,3 @@ def setup_logging(output_dir: Path) -> None:
     logger.add(sys.stderr, format=fmt_console, level="INFO")  # ← Usar sys.stderr
 
     logger.info("Logging inicializado")
-
-

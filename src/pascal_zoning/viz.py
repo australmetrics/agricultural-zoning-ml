@@ -85,9 +85,7 @@ def zoning_overview(
 
         # Plotear contorno total (línea exterior)
         boundary = gpd.GeoDataFrame(geometry=[zones.unary_union], crs=zones.crs)
-        boundary.boundary.plot(
-            ax=axes[0], color="black", linewidth=1
-        )
+        boundary.boundary.plot(ax=axes[0], color="black", linewidth=1)
 
         # Ajustar límites con un pequeño margen
         axes[0].set_xlim(bounds[0] - margin * dx, bounds[2] + margin * dx)
@@ -139,7 +137,3 @@ def zoning_overview(
     )
     plt.close(fig)
     logger.info(f"Visualización guardada en {out_png}")
-
-
-
-

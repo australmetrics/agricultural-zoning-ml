@@ -4,6 +4,7 @@ from pascal_zoning.pipeline import app
 
 runner = CliRunner()
 
+
 def test_help_command() -> None:
     """Verifica que el subcomando 'run' muestra ayuda correctamente."""
     result = runner.invoke(app, ["run", "--help"])

@@ -7,7 +7,7 @@ from importlib.metadata import version, PackageNotFoundError
 
 try:
     __version__ = version(__name__)
-except PackageNotFoundError:     # ejecución en editable / dev
+except PackageNotFoundError:  # ejecución en editable / dev
     __version__ = "0.0.0-dev"
 
 # API pública
@@ -35,4 +35,3 @@ __all__ = [
     "ZoningConfig",
     "ZoningPipeline",
 ]
-

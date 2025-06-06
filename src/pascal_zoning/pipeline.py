@@ -37,10 +37,8 @@ VALID_INDICES = ["ndvi", "ndwi", "ndre", "si"]
 # Helpers internos
 # --------------------------------------------------------------------------- #
 
-def _load_indices(
-    block: NDVIBlockInterface,
-    names: List[str]
-) -> dict[str, np.ndarray]:
+
+def _load_indices(block: NDVIBlockInterface, names: List[str]) -> dict[str, np.ndarray]:
     """
     Carga los índices espectrales solicitados desde el bloque.
 
@@ -67,6 +65,7 @@ def _load_indices(
 # --------------------------------------------------------------------------- #
 # Pipeline OO (usable también en tests)
 # --------------------------------------------------------------------------- #
+
 
 class ZoningPipeline:
     def __init__(
@@ -116,7 +115,9 @@ class ZoningPipeline:
         # 3) Verificar que el archivo TIFF exista
         # -------------------------------------------------------------
         if not raster_path.exists() or not raster_path.is_file():
-            raise typer.BadParameter(f"El archivo {raster_path} no existe o no es un archivo válido")
+            raise typer.BadParameter(
+                f"El archivo {raster_path} no existe o no es un archivo válido"
+            )
 
         # -------------------------------------------------------------
         # 4) Cargar índices espectrales desde el TIFF multibanda
@@ -141,25 +142,31 @@ class ZoningPipeline:
 
             # Extraer contornos de mask_valid
             geoms: list[BaseGeometry] = []
-            for geom_geojson, val in shapes(mask_valid, mask=mask_valid, transform=transform):
+            for geom_geojson, val in shapes(
+                mask_valid, mask=mask_valid, transform=transform
+            ):
                 if val == 1:
                     geoms.append(shape_from_geojson(geom_geojson))
 
             if not geoms:
-                raise ProcessingError("No se pudo derivar polígono: todos los píxeles están en 0.")
+                raise ProcessingError(
+                    "No se pudo derivar polígono: todos los píxeles están en 0."
+                )
             polygon_union = unary_union(geoms)
 
         # -------------------------------------------------------------
         # 6) Preparar bounds y parámetros de zonificación
         # -------------------------------------------------------------
         bounds = polygon_union  # Polygon o MultiPolygon
-        tamaño_mínimo = min_zone_size if min_zone_size is not None else self.config.min_zone_size_ha
+        tamaño_mínimo = (
+            min_zone_size if min_zone_size is not None else self.config.min_zone_size_ha
+        )
 
         engine = AgriculturalZoning(
             random_state=self.config.random_state,
             min_zone_size_ha=tamaño_mínimo,
             max_zones=self.config.max_zones,
-            output_dir=carpeta_base
+            output_dir=carpeta_base,
         )
 
         # -------------------------------------------------------------
@@ -171,20 +178,18 @@ class ZoningPipeline:
             points_per_zone=self.config.min_points_per_zone,
             crs=crs,
             force_k=force_k,
-            output_dir=carpeta_base
+            output_dir=carpeta_base,
         )
 
         # -------------------------------------------------------------
         # 8) Generar visualización resumen (zoning_overview)
         # -------------------------------------------------------------
         out_png = carpeta_base / "zonificacion_results.png"
-        zoning_overview(
-            zones=result.zones,
-            samples=result.samples,
-            out_png=out_png
-        )
+        zoning_overview(zones=result.zones, samples=result.samples, out_png=out_png)
 
-        logger.info(f"– Ejecución finalizada correctamente. Resultados en: {carpeta_base}")
+        logger.info(
+            f"– Ejecución finalizada correctamente. Resultados en: {carpeta_base}"
+        )
         return result
 
 
@@ -192,39 +197,31 @@ class ZoningPipeline:
 # CLI
 # --------------------------------------------------------------------------- #
 
+
 @app.command()
 def run(
     raster: Path = typer.Option(
-        ...,
-        "--raster",
-        help="Ruta al TIFF multibanda recortado al predio (6 bandas)."
+        ..., "--raster", help="Ruta al TIFF multibanda recortado al predio (6 bandas)."
     ),
     output_dir: Path = typer.Option(
-        Path("outputs"),
-        "--output-dir",
-        help="Directorio base de resultados"
+        Path("outputs"), "--output-dir", help="Directorio base de resultados"
     ),
     indices: str = typer.Option(
         "ndvi,ndwi,ndre,si",
         "--indices",
         "-i",
-        help=f"Cadena separada por coma de índices a usar. Valores permitidos: {VALID_INDICES}"
+        help=f"Cadena separada por coma de índices a usar. Valores permitidos: {VALID_INDICES}",
     ),
     force_k: int = typer.Option(
-        None,
-        "--force-k",
-        "-k",
-        help="Si se pasa, fuerza ese número de clusters"
+        None, "--force-k", "-k", help="Si se pasa, fuerza ese número de clusters"
     ),
     min_zone_size: float = typer.Option(
         None,
         "--min-zone-size",
-        help="Tamaño mínimo de zona en hectáreas. Si no se especifica, se usa el valor del archivo de configuración"
+        help="Tamaño mínimo de zona en hectáreas. Si no se especifica, se usa el valor del archivo de configuración",
     ),
     config_file: Path = typer.Option(
-        None,
-        "--config",
-        help="JSON de configuración; opcional"
+        None, "--config", help="JSON de configuración; opcional"
     ),
 ) -> None:
     """
@@ -244,7 +241,9 @@ def run(
     try:
         # 1) Validar archivo TIFF
         if not raster.exists() or not raster.is_file():
-            raise typer.BadParameter(f"El archivo {raster} no existe o no es un archivo válido")
+            raise typer.BadParameter(
+                f"El archivo {raster} no existe o no es un archivo válido"
+            )
 
         # 2) Normalizar índices: siempre llega como string
         index_list = [s.strip().lower() for s in indices.split(",") if s.strip()]
@@ -280,31 +279,30 @@ def run(
 @app.command()
 def zonificar(
     raster: Path = typer.Argument(
-        ...,
-        help="Ruta al TIFF multibanda recortado al predio (6 bandas)."
+        ..., help="Ruta al TIFF multibanda recortado al predio (6 bandas)."
     ),
     output_dir: Path = typer.Option(
         Path("outputs"),
         "--output-dir",
         "-o",
-        help="Carpeta base donde se guardan los resultados."
+        help="Carpeta base donde se guardan los resultados.",
     ),
     indices: str = typer.Option(
         ",".join(VALID_INDICES),
         "--indices",
         "-i",
-        help=f"Cadena separada por coma de índices a procesar. Valores posibles: {VALID_INDICES}"
+        help=f"Cadena separada por coma de índices a procesar. Valores posibles: {VALID_INDICES}",
     ),
     force_k: int = typer.Option(
         None,
         "--force-k",
         "-k",
-        help="Si se especifica, fuerza este número específico de clusters."
+        help="Si se especifica, fuerza este número específico de clusters.",
     ),
     min_zone_size: float = typer.Option(
         None,
         "--min-zone-size",
-        help="Tamaño mínimo de zona en hectáreas. Si no se especifica, se usa el valor del archivo de configuración"
+        help="Tamaño mínimo de zona en hectáreas. Si no se especifica, se usa el valor del archivo de configuración",
     ),
 ) -> None:
     """
@@ -314,7 +312,9 @@ def zonificar(
     try:
         # 1) Validar TIFF
         if not raster.exists() or not raster.is_file():
-            raise typer.BadParameter(f"El archivo {raster} no existe o no es un archivo válido")
+            raise typer.BadParameter(
+                f"El archivo {raster} no existe o no es un archivo válido"
+            )
 
         # 2) Normalizar índices (siempre string separado por coma)
         index_list = [s.strip().lower() for s in indices.split(",") if s.strip()]
@@ -350,12 +350,3 @@ def main():
 
 if __name__ == "__main__":
     app()
-
-
-
-
-
-
-
-
-

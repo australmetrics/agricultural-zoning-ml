@@ -4,6 +4,7 @@ import numpy as np
 import geopandas as gpd
 from shapely.geometry import Polygon
 
+
 @pytest.fixture
 def synthetic_indices_2x2():
     """
@@ -15,10 +16,10 @@ def synthetic_indices_2x2():
     ndre = np.array([[-0.1, -0.2], [-0.3, -0.4]], dtype=float)
     return {"ndvi": ndvi, "ndre": ndre}
 
+
 @pytest.fixture
 def synthetic_bounds_polygon():
     """
     Devuelve un polígono 2×2 (0,0)-(2,0)-(2,2)-(0,2) para usar como bounds.
     """
     return Polygon([(0, 0), (2, 0), (2, 2), (0, 2)])
-

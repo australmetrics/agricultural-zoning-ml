@@ -118,7 +118,7 @@ class NDVIBlockInterface:
           2) Que todas las matrices existan, sean float, y tengan idéntica forma.
              - Si la forma es inconsistente → lanza Exception.
           3) Calcula el % de píxeles válidos (no NaN) para cada índice.
-             - Si para algún índice el ratio < quality_threshold → emite warning, 
+             - Si para algún índice el ratio < quality_threshold → emite warning,
                pero igual retorna True.
           4) Si todo OK, retorna True.
         """
@@ -139,7 +139,9 @@ class NDVIBlockInterface:
         formas = [forma for _, forma in shapes]
         if len({forma for forma in formas}) != 1:
             lista_formas = [f"{n}:{s}" for n, s in shapes]
-            logger.error(f"Las formas de los índices son inconsistentes: {lista_formas}")
+            logger.error(
+                f"Las formas de los índices son inconsistentes: {lista_formas}"
+            )
             raise Exception("Formas de índices espectrales inconsistentes")
 
         # Chequear %, emitir warning si debajo del umbral
@@ -178,13 +180,3 @@ class NDVIBlockInterface:
             )
         with rasterio.open(tif_files[0]) as src:
             return src.crs
-
-
-
-
-
-
-
-
-
-

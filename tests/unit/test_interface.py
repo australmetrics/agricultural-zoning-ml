@@ -80,5 +80,3 @@ def test_validate_spectral_data_shapes_and_quality(synthetic_indices_2x2):
 
     # Verificamos que, si no hay índices (dict vacío), retorne False
     assert interface.validate_spectral_data({}) is False
-
-

@@ -92,13 +92,19 @@ def test_cli_workflow_creates_outputs(git_root, tmp_path):
     #    pascal_zoning.pipeline run --raster … --indices … --output-dir … --force-k … --min-zone-size …
     cmd = [
         sys.executable,
-        "-m", "pascal_zoning.pipeline",
+        "-m",
+        "pascal_zoning.pipeline",
         "run",
-        "--raster", str(tif_path),
-        "--output-dir", str(outputs_dir),
-        "--indices", "NDVI,NDWI,NDRE,SI",
-        "--force-k", "2",                  
-        "--min-zone-size", "0.00005",      
+        "--raster",
+        str(tif_path),
+        "--output-dir",
+        str(outputs_dir),
+        "--indices",
+        "NDVI,NDWI,NDRE,SI",
+        "--force-k",
+        "2",
+        "--min-zone-size",
+        "0.00005",
     ]
 
     proc = subprocess.run(
@@ -130,6 +136,3 @@ def test_cli_workflow_creates_outputs(git_root, tmp_path):
     produced = {p.name for p in exec_dir.iterdir() if p.is_file()}
     missing = expected - produced
     assert not missing, f"Faltan archivos en {exec_dir}: {missing}"
-
-
-
