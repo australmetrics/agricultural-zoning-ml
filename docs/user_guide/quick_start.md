@@ -1,4 +1,26 @@
-# Quick Start Guide
+# Guía Rápida
+
+## Instalación
+
+```bash
+pip install pascal-zoning-ml
+```
+
+## Uso con PASCAL NDVI Block
+
+### 1. Generar Índices con PASCAL NDVI Block
+
+Primero, ejecuta el PASCAL NDVI Block para generar los índices espectrales:
+
+```bash
+pascal-ndvi process imagen.tif --output indices/
+```
+
+Esto generará:
+- ndvi.tif
+- ndre.tif (opcional)
+- savi.tif (opcional)
+- manifest.json
 
 © 2025 AustralMetrics SpA. All rights reserved.
 
@@ -250,3 +272,68 @@ grep "Processing complete" results/logs/*.log
 ---
 
 **Congratulations!** You've successfully processed your first satellite imagery with PASCAL NDVI Block. The system has automatically documented your analysis in compliance with ISO 42001 standards for full traceability and audit capability.
+
+## Uso con PASCAL Zoning
+
+### 1. Ejecutar Zonificación
+
+Usando Python:
+
+```python
+from pascal_zoning import AgriculturalZoning
+from pathlib import Path
+
+# Configurar rutas
+ndvi_dir = Path("indices")  # Directorio con outputs del NDVI Block
+output_dir = Path("zonificacion")
+
+# Ejecutar zonificación
+zoning = AgriculturalZoning()
+results = zoning.run_pipeline(
+    ndvi_block_output_dir=ndvi_dir,
+    output_dir=output_dir,
+    points_per_zone=10,  # Puntos de muestreo por zona
+    min_distance=50.0    # Distancia mínima entre puntos (metros)
+)
+```
+
+O usando la línea de comandos:
+
+```bash
+pascal-zoning zonificar indices/ --output zonificacion/ --puntos-por-zona 10 --distancia-min 50
+```
+
+### 2. Resultados
+
+El proceso generará:
+
+1. **zonificacion_agricola.gpkg**: Polígonos de zonas de manejo
+   - Incluye: ID de zona, área en hectáreas, geometría
+
+2. **puntos_muestreo.gpkg**: Puntos de muestreo estratificados
+   - Incluye: ID de zona, coordenadas
+
+3. **zonificacion_results.png**: Visualización de resultados
+   - Mapa de zonas
+   - Gráfico de áreas
+
+### 3. Verificación de Resultados
+
+```python
+import geopandas as gpd
+
+# Cargar resultados
+zones = gpd.read_file("zonificacion/zonificacion_agricola.gpkg")
+samples = gpd.read_file("zonificacion/puntos_muestreo.gpkg")
+
+# Imprimir estadísticas
+print(f"Número de zonas: {len(zones)}")
+print(f"Área total: {zones.area_ha.sum():.1f} ha")
+print(f"Puntos de muestreo: {len(samples)}")
+```
+
+## Siguientes Pasos
+
+- [Documentación Técnica Detallada](../technical/technical_documentation.md)
+- [Ejemplos Avanzados](../examples/advanced_examples.md)
+- [Guía de Usuario Completa](user_guide.md)

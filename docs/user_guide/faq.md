@@ -1,317 +1,379 @@
 # Frequently Asked Questions (FAQ)
 
-© 2025 AustralMetrics SpA. All rights reserved.
+This FAQ provides concise answers to common questions about PASCAL Agri-Zoning, with emphasis on alignment to **ISO/IEC 42001:2023**—the AI Management System standard. Wherever applicable, references to ISO 42001 practices are noted.
 
-Common questions and answers about the PASCAL NDVI Block module, designed for ISO 42001 compliance and ease of use.
+---
 
-## General Questions
+## 1. How does PASCAL Agri-Zoning align with ISO 42001's AI governance requirements?
 
-### Q: What is the PASCAL NDVI Block?
-**A:** PASCAL NDVI Block is a high-performance Python module designed to calculate vegetation indices (NDVI, NDRE, SAVI) from Sentinel-2 and Landsat satellite imagery. It focuses on simplicity, automation, and ISO 42001 compliance for artificial intelligence management systems.
+**Answer:**  
+PASCAL Agri-Zoning implements a governance framework that follows core ISO 42001 clauses on AI accountability and oversight. Key points include:
 
-### Q: Which satellite imagery formats are supported?
-**A:** The module supports:
-- **Sentinel-2**: GeoTIFF and JP2 formats with bands B4 (Red), B8 (NIR), B5 (Red Edge), B8A (NIR Narrow)
-- **Landsat**: GeoTIFF format with bands 4 (Red) and 5 (NIR)
-- **General**: Any GeoTIFF file with appropriate spectral bands
+- **Roles & Responsibilities (Clause 5.3):**  
+  - The package assumes a designated "AI Manager" role who oversees configuration (`ZoningConfig`), reviews log outputs, and signs off on model outputs before deployment.
+  - Logging (via `logging_config.py`) captures audit trails—timestamps, user actions, configuration parameters—aligned to Clause 7.5 (Traceability & Transparency).
 
-### Q: What vegetation indices can I calculate?
-**A:** Three vegetation indices are supported:
-- **NDVI** (Normalized Difference Vegetation Index): (NIR - Red) / (NIR + Red)
-- **NDRE** (Normalized Difference Red Edge): (NIR - RedEdge) / (NIR + RedEdge)
-- **SAVI** (Soil Adjusted Vegetation Index): ((NIR - Red) / (NIR + Red + L)) × (1 + L), where L = 0.5
+- **Policy & Documentation (Clause 5.2):**  
+  - Every run produces a versioned `ClusterMetrics` JSON output that includes `project_name`, `project_version`, and `random_state` fields. This ensures that each zoning execution is documented for compliance and reproducibility.
+  - A `config.json` schema embeds metadata fields matching ISO 42001 metadata requirements (e.g., "project_name," "ai_manager," "creation_date").
 
-### Q: What are the system requirements?
-**A:** 
-- **Python**: 3.7 or higher
-- **Operating Systems**: Windows, Linux, macOS
-- **Memory**: Minimum 4GB RAM (8GB+ recommended for large images)
-- **Disk Space**: At least 2x the size of your input imagery
-- **Dependencies**: Automatically installed via `requirements.txt`
+---
 
-## Installation and Setup
+## 2. What AI risk-management measures are embedded in the pipeline?
 
-### Q: How do I install the module?
-**A:** Follow these steps:
-```bash
-# 1. Clone the repository
-git clone https://github.com/australmetrics/pascal-ndvi-block.git
-cd pascal-ndvi-block
+**Answer:**  
+Per ISO 42001 Clause 6 (Risk Management), PASCAL incorporates multiple layers of validation and checks to mitigate AI-specific risks:
 
-# 2. Create virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or venv\Scripts\activate on Windows
+1. **Data Quality Validation (Clause 6.4):**  
+   - The `NDVIBlockInterface` checks that each spectral index array lies within `[-1.0, 1.0]` (`ValidationConfig.spectral_index_range`).  
+   - If more than `ValidationConfig.max_nan_ratio` (default 30%) of pixels are invalid (NaN), the pipeline raises a `ProcessingError`, preventing unreliable outputs.
 
-# 3. Install dependencies
-pip install -r requirements.txt
+2. **Bias & Representativeness (Clause 6.5):**  
+   - A minimum percent of valid pixels (`ValidationConfig.min_valid_pixels_ratio`, default 70%) ensures geographical representativeness.  
+   - The selection of sampling points uses a Poisson-disk–like algorithm to avoid spatial clustering bias.
 
-# 4. Configure environment
-cp .env.example .env
-# Edit .env with your settings
+3. **Model Validation (Clause 6.6):**  
+   - `AgriculturalZoning.select_optimal_clusters()` computes Silhouette and Calinski-Harabasz scores for k = 2…`max_clusters`. The "best K" is chosen to avoid under- or over-segmentation (mitigating model performance risk).
+
+4. **Continuous Monitoring (Clause 9.2):**  
+   - Upon each run, `ClusterMetrics.timestamp` is recorded. Users can track performance drift over time by comparing metric JSON outputs.
+
+---
+
+## 3. How can I demonstrate traceability and auditability for ISO 42001 compliance?
+
+**Answer:**  
+Traceability is achieved via:
+
+- **Comprehensive Logging (Clause 7.5):**  
+  - Each execution writes a log file (`logs/agri_zoning_<timestamp>.log`) capturing:  
+    - User-provided parameters (`index_names`, `force_k`, `min_zone_size`)  
+    - Config checksum (SHA256 of the loaded JSON)  
+    - Warnings/errors with stack traces  
+
+- **Versioned Configuration Files (Clause 7.4):**  
+  - The pipeline accepts a JSON config with `"project_version"` and other metadata. For example:
+    ```json
+    {
+      "project_name": "Cherry_Orchard_Zoning",
+      "project_version": "1.2.0",
+      "ai_manager": "robinson@example.com",
+      "creation_date": "2025-06-10T14:30:00Z",
+      "random_state": 42,
+      "min_zone_size_ha": 0.5,
+      "max_zones": 15,
+      "model": {
+        "clustering_method": "kmeans",
+        "max_clusters": 10
+      },
+      "validation": {
+        "spectral_index_range": [-1.0, 1.0],
+        "min_valid_pixels_ratio": 0.7,
+        "max_nan_ratio": 0.3
+      }
+    }
+    ```
+  - Embedding `creation_date` and `ai_manager` ensures that each run is traceable to a responsible individual and timestamp.
+
+- **Result Artifacts (Clause 8.3 & 8.4):**  
+  - GeoPackages (`zonificacion_agricola.gpkg`, `puntos_muestreo.gpkg`) include feature attributes indicating the clustering label and pixel coordinate provenance.
+  - `metricas_clustering.json` captures performance metrics. Retaining these artifacts aligns with ISO's requirement to preserve AI decision records.
+
+---
+
+## 4. What privacy and security controls are integrated?
+
+**Answer:**  
+Aligned to ISO 42001 Clause 8 (Privacy & Security Controls), PASCAL enforces:
+
+- **Minimal Data Collection:**  
+  - Only four spectral indices (NDVI, NDWI, NDRE, SI) are computed and stored. No personally identifiable information (PII) or sensitive farmer data is ever written to logs or outputs.
+
+- **Secure Logging (Clause 8.3):**  
+  - Logs do not record file paths outside the project directory.  
+  - If running in multi-user environments, file permissions on `logs/` and output directories should be set to prevent unauthorized access (e.g., `chmod 750 logs/`).
+
+- **Configuration Hygiene (Clause 8.4):**  
+  - Sensitive fields (e.g., credentials for cloud storage, if used) are **not** stored in plain text. Instead, the pipeline expects environment variables (`AWS_S3_KEY`, `AWS_S3_SECRET`) to be set and references them indirectly.
+
+---
+
+## 5. Where can I find the configuration schema and how is it ISO-aligned?
+
+**Answer:**  
+The configuration schema lives in `pascal_zoning/config.py` as three dataclasses: `ZoningConfig`, `ModelConfig`, and `ValidationConfig`. Each field maps to ISO 42001 clauses. A minimal example:
+
+```json
+{
+  "project_name": "Biobio_Cherries",
+  "project_version": "0.9.1",
+  "ai_manager": "ai.manager@australmetrics.cl",
+  "random_state": 2025,
+  "min_zone_size_ha": 0.5,
+  "max_zones": 12,
+  "min_points_per_zone": 5,
+  "model": {
+    "clustering_method": "kmeans",
+    "max_clusters": 12,
+    "random_state": 2025
+  },
+  "validation": {
+    "spectral_index_range": [-1.0, 1.0],
+    "min_valid_pixels_ratio": 0.75,
+    "max_nan_ratio": 0.25
+  },
+  "parallel_processing": true,
+  "n_jobs": 4,
+  "output_formats": ["gpkg", "geojson"],
+  "create_visualizations": true,
+  "log_level": "INFO"
+}
 ```
 
-### Q: Do I need to install GDAL separately?
-**A:** No, GDAL is included as a dependency through rasterio. However, if you encounter installation issues on Windows, you may need to install GDAL manually:
-```bash
-pip install GDAL
-pip install rasterio
+Fields like "project_name" and "project_version" address Clause 5.2 (AI Policy and Objectives).
+
+"ai_manager" references the person responsible (Clause 7.1).
+
+Validation thresholds echo Clause 6.4 (Data Quality).
+
+Logging level ("log_level") and parallel processing controls support Clause 9.1 (Operational Controls).
+
+---
+
+## 6. How is model performance evaluated and documented?
+
+**Answer:**  
+Aligned to ISO 42001 Clause 6 (Performance Evaluation):
+
+**Automatic K Selection (Clause 6.6):**
+
+The method `select_optimal_clusters()` computes Silhouette and Calinski-Harabasz scores for k = 2…max_clusters. The optimal K is chosen based on maximum silhouette.
+
+**Cluster Metrics Output (Clause 7.5):**
+
+A JSON file `metricas_clustering.json` is created with:
+
+```json
+{
+  "n_clusters": 5,
+  "silhouette": 0.62,
+  "calinski_harabasz": 350.5,
+  "inertia": 10245.3,
+  "cluster_sizes": [1200, 900, 800, 600, 500],
+  "timestamp": "2025-06-10T14:32:45Z"
+}
 ```
 
-### Q: What should I put in the .env file?
-**A:** The `.env` file should contain:
+Storing these metrics alongside timestamps provides an audit trail for performance validation.
+
+**Zone Statistics (Clause 7.4):**
+
+`estadisticas_zonas.csv` contains area, perimeter, compactness, and spectral mean/std for each zone. Continuous monitoring of these statistics over multiple runs can detect dataset drift or model degradation.
+
+---
+
+## 7. What steps ensure data integrity and reproducibility?
+
+**Answer:**  
+Per ISO 42001 Clause 7 (Documented Information & Control):
+
+**Version-Controlled Code:**
+
+The repository should tag each release (e.g., v1.0.0) in GitHub.
+
+The `__init__.py` version string is synchronized with Git tags.
+
+**Checksum Verification (Clause 7.3):**
+
+Upon loading a JSON config, the pipeline computes a SHA256 checksum and logs it as `config_checksum`.
+
+Example log line:
+
 ```
-USERNAME=your_username_here
-LOG_LEVEL=INFO
-```
-- `USERNAME`: Used for audit logging (ISO 42001 compliance)
-- `LOG_LEVEL`: Controls logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-
-### Q: Can I run this without a virtual environment?
-**A:** While possible, it's strongly recommended to use a virtual environment to avoid dependency conflicts and maintain a clean Python installation.
-
-## Usage Questions
-
-### Q: What's the simplest way to process an image?
-**A:** Use the automated processing command:
-```bash
-python -m src.main auto --image=data/my_image.tif
-```
-This will automatically detect bands and calculate all three indices (NDVI, NDRE, SAVI).
-
-### Q: How do I process only a specific area of my image?
-**A:** Use the clipping functionality with a shapefile:
-```bash
-# Clip and process in one command
-python -m src.main auto --image=data/my_image.tif --shapefile=data/area.shp
-
-# Or clip first, then process
-python -m src.main clip --image=data/my_image.tif --shapefile=data/area.shp
-python -m src.main indices --image=results/clipped_image.tif
+[INFO] 2025-06-10 14:30:00 | Loaded config.json (SHA256: 3f2e47ab9c1d...)
 ```
 
-### Q: Can I calculate only specific indices?
-**A:** Currently, the module calculates all three indices (NDVI, NDRE, SAVI) together for efficiency. Individual index calculation is not supported in this version.
+**Seeded Randomness (Clause 7.1):**
 
-### Q: Where are the results saved?
-**A:** Results are saved in the `results/` directory by default:
-- **Indices**: `results/indices/ndvi_result.tif`, `results/indices/ndre_result.tif`, `results/indices/savi_result.tif`
-- **Clipped images**: `results/clipped/`
-- **Logs**: `results/logs/pascal_ndvi_YYYYMMDD_HHMMSS.log`
+All randomness (cluster initialization, sampling point selection) uses a single `random_state` seed defined in the config to guarantee reproducibility.
 
-### Q: Can I specify a different output directory?
-**A:** Yes, use the `--output` parameter:
-```bash
-python -m src.main indices --image=data/my_image.tif --output=my_custom_results
+**Result Packaging (Clause 8.5):**
+
+Each run exports a zipped archive (`<project_name>_<timestamp>.zip`) containing:
+
+- `zonificacion_agricola.gpkg`
+- `puntos_muestreo.gpkg`
+- `estadisticas_zonas.csv`
+- `metricas_clustering.json`
+- All log files generated under `logs/`
+
+---
+
+## 8. Can I customize or extend the pipeline while remaining ISO 42001-compliant?
+
+**Answer:**  
+Yes. Key extension points:
+
+**Custom Clustering (Clause 6.6):**
+
+The `model.clustering_method` parameter can accept "kmeans," "agglomerative," or a user-supplied scikit-learn estimator that implements `fit_predict(X)`.
+
+When you plug in a custom estimator, update the config to include `"custom_model": "sklearn.cluster.DBSCAN"` and supply parameters like `eps` and `min_samples`. Maintain metadata about this custom model in the config for traceability.
+
+**Alternate Validation Rules (Clause 6.4):**
+
+You can override `ValidationConfig` thresholds. For example, if using an image with higher noise, set:
+
+```json
+"validation": {
+  "spectral_index_range": [-0.8, 0.8],
+  "min_valid_pixels_ratio": 0.6,
+  "max_nan_ratio": 0.4
+}
 ```
 
-## Data and Processing
+Document these changes in the config's `change_log` field to comply with documented information control (Clause 7.2).
 
-### Q: What image sizes can the module handle?
-**A:** The module can process various image sizes:
-- **Small images** (< 100 MB): Process directly
-- **Medium images** (100 MB - 1 GB): Ensure sufficient RAM
-- **Large images** (> 1 GB): Consider using clipping to process smaller areas, or ensure adequate system resources
+**Integration with Downstream Systems (Clause 8.2):**
 
-### Q: How long does processing take?
-**A:** Processing time depends on:
-- **Image size**: Larger images take longer
-- **System specs**: More RAM and CPU cores improve speed
-- **Typical times**:
-  - Small image (50 MB): 1-2 minutes
-  - Medium image (500 MB): 5-10 minutes
-  - Large image (2 GB): 30-60+ minutes
+If you integrate PASCAL outputs into an ERP or farm-management system, ensure API calls to external services are secured (HTTPS only) and that access controls (OAuth tokens) are stored in environment variables, not hardcoded.
 
-### Q: What coordinate systems are supported?
-**A:** The module preserves the coordinate system of the input image. Common supported systems include:
-- UTM zones
-- Geographic (WGS84)
-- Any projection supported by GDAL/PROJ
+---
 
-### Q: Can I process multiple images at once?
-**A:** Currently, the module processes one image at a time. For batch processing, you can create a script that calls the module multiple times:
-```bash
-for image in data/*.tif; do
-    python -m src.main auto --image="$image"
-done
-```
+## 9. How do I handle updates and continuous improvement per ISO 42001?
 
-### Q: What happens if my image has clouds or no-data areas?
-**A:** The module automatically handles:
-- **No-data values**: Properly masked and excluded from calculations
-- **Invalid pixels**: Filtered out during index calculation
-- **Result**: Output indices will have appropriate no-data values in these areas
+**Answer:**  
+ISO 42001 Clause 9 (Monitoring, Measurement, Analysis & Improvement) recommends a Plan-Do-Check-Act (PDCA) cycle:
 
-## Output and Results
+**Monitor:**
 
-### Q: What format are the output files?
-**A:** All output files are saved as GeoTIFF (.tif) format with:
-- Same coordinate system as input
-- Same pixel size and extent (unless clipped)
-- Single band containing the calculated index values
-- Proper no-data value handling
+After each run, collect metrics from `metricas_clustering.json`.
 
-### Q: What do the index values mean?
-**A:** Index value ranges and interpretation:
-- **NDVI**: -1 to +1
-  - < 0: Water, snow, clouds
-  - 0 to 0.3: Bare soil, rocks
-  - 0.3 to 0.7: Vegetation (higher = healthier/denser)
-- **NDRE**: -1 to +1 (similar to NDVI but using red edge)
-- **SAVI**: Similar to NDVI but adjusted for soil background
+Use a simple script to aggregate silhouette over time:
 
-### Q: Can I open the results in GIS software?
-**A:** Yes, the GeoTIFF output files can be opened in:
-- QGIS (free, open-source)
-- ArcGIS
-- Google Earth Engine
-- Any GIS software supporting GeoTIFF format
-
-### Q: How do I visualize the results?
-**A:** You can:
-1. **Use GIS software** for interactive visualization
-2. **Python visualization**:
-   ```python
-   import rasterio
-   import matplotlib.pyplot as plt
-   
-   with rasterio.open('results/indices/ndvi_result.tif') as src:
-       ndvi = src.read(1)
-   
-   plt.imshow(ndvi, cmap='RdYlGn', vmin=-1, vmax=1)
-   plt.colorbar(label='NDVI')
-   plt.show()
-   ```
-
-## Logging and Compliance
-
-### Q: Why does the module create log files?
-**A:** Log files are required for ISO 42001 compliance and provide:
-- **Audit trail**: Complete record of processing activities
-- **Troubleshooting**: Detailed information for problem diagnosis
-- **Compliance**: Meeting artificial intelligence management system standards
-- **Quality assurance**: Verification of processing parameters and results
-
-### Q: Where are log files stored?
-**A:** Logs are stored in `results/logs/`:
-- **Main logs**: `pascal_ndvi_YYYYMMDD_HHMMSS.log`
-- **Backups**: `backup/pascal_ndvi_*_backup.log`
-- **Integrity checks**: `*.sha256` files for verification
-
-### Q: What information is logged?
-**A:** Each log entry includes:
-- Precise timestamp
-- User information (from .env file)
-- Processing parameters
-- Input/output file paths
-- Error messages (if any)
-- Processing duration
-- System information
-
-### Q: How long are logs kept?
-**A:** Logs are automatically managed:
-- **Current logs**: Kept indefinitely
-- **Backup logs**: Compressed and archived
-- **Cleanup**: Manual cleanup of old logs may be needed for disk space management
-
-### Q: Can I disable logging?
-**A:** No, logging cannot be disabled as it's required for ISO 42001 compliance. However, you can adjust the verbosity level in the `.env` file:
-- `LOG_LEVEL=ERROR`: Only errors
-- `LOG_LEVEL=WARNING`: Warnings and errors
-- `LOG_LEVEL=INFO`: General information (recommended)
-- `LOG_LEVEL=DEBUG`: Detailed debugging information
-
-## Troubleshooting
-
-### Q: What should I do if I get a "file not found" error?
-**A:** Check these common issues:
-1. Verify the file path is correct
-2. Ensure the file exists and is readable
-3. Use absolute paths if relative paths don't work
-4. Check file permissions
-
-### Q: Why am I getting memory errors?
-**A:** Memory errors typically occur with large images:
-1. **Close other applications** to free RAM
-2. **Use clipping** to process smaller areas
-3. **Upgrade system memory** if possible
-4. **Process during off-peak hours** when more memory is available
-
-### Q: The processing seems stuck. What should I do?
-**A:** If processing appears to hang:
-1. **Check log files** for the latest activity
-2. **Monitor system resources** (CPU, memory usage)
-3. **Wait longer** - large images can take considerable time
-4. **Restart if necessary** and try with a smaller image or clipped area
-
-### Q: Where can I get help?
-**A:** Support resources:
-1. **Documentation**: Check the `docs/` folder
-2. **Troubleshooting guide**: `docs/user_guide/troubleshooting.md`
-3. **GitHub issues**: For internal users, create an issue in the repository
-4. **Development team**: Contact AustralMetrics SpA development team for urgent issues
-
-## Advanced Usage
-
-### Q: Can I integrate this module into my own Python scripts?
-**A:** Yes, you can import and use the module components:
 ```python
-from src.indices import calculate_indices
-from src.preprocessor import clip_image
-
-# Your custom processing logic here
+import json, glob
+metrics_files = glob.glob("outputs/*/metricas_clustering.json")
+for f in metrics_files:
+    data = json.load(open(f))
+    print(f"{data['timestamp']}: silhouette = {data['silhouette']}")
 ```
 
-### Q: Is there an API or web service version?
-**A:** Currently, only the command-line interface is available. API development may be considered for future versions.
+**Analyze:**
 
-### Q: Can I modify the index calculation formulas?
-**A:** The current version uses standard formulas for vegetation indices. Modifications would require editing the source code in `src/indices.py`, but this may affect ISO 42001 compliance and validation.
+Plot trends (e.g., silhouette vs. date) using matplotlib or business intelligence tools.
 
-### Q: How do I update to newer versions?
-**A:** To update:
+Look for downward trends indicating model drift.
+
+**Improve:**
+
+If performance degrades, update:
+
+- `max_zones` range
+- Preprocessing steps (e.g., apply histogram equalization in `NDVIBlockInterface`)
+- Parameterize new spectral indices (e.g., adding SAVI or EVI)
+
+**Document:**
+
+Record each improvement in a `changelog.md` alongside version tags.
+
+Example changelog entry:
+
+```markdown
+## v1.1.0 (2025-07-01)
+- Added Savitzky–Golay smoothing in spectral preprocessing (Clause 6.4).
+- Updated clustering method to use DBSCAN for small vineyards (Clause 6.6).
+- Enhanced logging detail to include `memory_usage` metrics (Clause 9.3).
+```
+
+---
+
+## 10. How do I report non-conformance or file an issue?
+
+**Answer:**  
+Following ISO 42001 Clause 10 (Nonconformity & Corrective Action):
+
+**Identify Nonconformance:**
+
+If you detect unexpected patterns (e.g., zones not matching known field boundaries), treat it as a nonconformance.
+
+Record the issue in an internal log:
+
 ```bash
-git pull origin main
-pip install -r requirements.txt --upgrade
+echo "Nonconformance: Unexpected zone shape on 2025-06-10" >> nonconformance.log
 ```
-Check the changelog for any breaking changes or new requirements.
 
-## Compliance and Quality
+**Corrective Action:**
 
-### Q: What does ISO 42001 compliance mean for users?
-**A:** ISO 42001 compliance ensures:
-- **Reliability**: Consistent and reproducible results
-- **Traceability**: Complete audit trail of all operations
-- **Quality**: Rigorous testing and documentation standards
-- **Transparency**: Clear documentation of methods and limitations
+Re-run the pipeline with debug logging (`"log_level": "DEBUG"`) to gather more information.
 
-### Q: How do I verify the integrity of results?
-**A:** Verification methods include:
-1. **Log file review**: Check processing logs for errors or warnings
-2. **Visual inspection**: Review output images for expected patterns
-3. **Statistical analysis**: Check index value distributions
-4. **Hash verification**: Use SHA-256 hashes for log file integrity
+Compare GeoPackage zone polygons against ground truth in GIS (Clause 9.2).
 
-### Q: Can I use this for commercial projects?
-**A:** This software is proprietary to AustralMetrics SpA. Usage rights depend on your relationship with the company and applicable licensing agreements. Contact the development team for licensing questions.
+**Preventive Action:**
 
-## Performance and Optimization
+Adjust validation thresholds or introduce additional data checks in `interface.py` to catch edge cases earlier.
 
-### Q: How can I speed up processing?
-**A:** Optimization strategies:
-1. **Use SSD storage** for input/output files
-2. **Ensure adequate RAM** (8GB+ recommended)
-3. **Close unnecessary applications** during processing
-4. **Use clipping** to process only areas of interest
-5. **Process during off-peak hours** for better system performance
+**Issue Reporting:**
 
-### Q: Does the module support parallel processing?
-**A:** The current version processes images sequentially. Parallel processing may be added in future versions based on user feedback and requirements.
+Open a GitHub issue:
 
-### Q: What's the maximum image size I can process?
-**A:** Maximum size depends on available system resources:
-- **RAM**: At least 4x the uncompressed image size
-- **Disk space**: At least 3x the input image size for temporary files and outputs
-- **Practical limits**: Successfully tested with images up to 10GB on appropriate hardware
+**Title:** "Nonconformance: Zone polygons do not match field boundary for Raster X"
 
-For additional questions not covered here, please refer to the troubleshooting guide or contact the development team.
+**Include:**
+
+- Full stack trace from log
+- Sample raster and expected output polygons
+- Config JSON used
+
+---
+
+## 11. What is the recommended way to integrate PASCAL into a larger ISO 42001–compliant AI ecosystem?
+
+**Answer:**  
+Integrating PASCAL into a broader AI Management System (ISO 42001 Clause 4) involves:
+
+**Aligning Organization's AI Policy (Clause 4.2):**
+
+Ensure that PASCAL's objectives (e.g., "improve yield predictions through zoning") match your organization's AI policy.
+
+**Mapping Processes (Clause 4.3):**
+
+Define how data flows from satellite ingestion → spectral index computation → clustering → GIS ingestion. Document each step in a flowchart (e.g., BPMN diagram) and assign process owners.
+
+**Internal Audits (Clause 9.5):**
+
+Periodically audit PASCAL configurations, logs, and outputs.
+
+Check that `ai_manager` email remains current, and that obsolete configuration files are archived (per Documented Information Control).
+
+**Training & Competency (Clause 7.1):**
+
+Ensure personnel running PASCAL have:
+
+- Basic GIS knowledge (QGIS, coordinate reference systems)
+- Understanding of KMeans clustering and spectral indices
+- Awareness of ISO 42001 requirements for data quality and privacy
+
+---
+
+## 12. Where can I find additional resources on ISO 42001 and best practices?
+
+**Answer:**
+
+**Official ISO/IEC 42001:2023 Standard Document**
+
+Purchase or access via your institutional library to read full clauses and requirements.
+
+**ISO Guidance Material (ISO 42001 Guidance Annex):**
+
+Contains explanatory material on implementing AI management systems, including templates for risk assessment and audit checklists.
+
+**AI Ethics & Governance Whitepapers:**
+
+Many organizations publish guidelines for aligning AI solutions to ISO 42001.
+
+For example, the "AI Governance Framework" by the Open Data Institute (ODI) offers practical templates that can be adapted for PASCAL.
+
+**Open-Source Audit Tools:**
+
+Tools like IBM AI Fairness 360 and Google's What-If Tool can be used alongside PASCAL to validate clustering fairness and distribution (useful for Clause 6.5 bias mitigation).

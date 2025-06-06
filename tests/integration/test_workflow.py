@@ -1,70 +1,135 @@
-"""Integration tests for verifying complete system workflow.
+# tests/integration/test_workflow.py
 
-Tests end-to-end functionality following ISO 42001 validation requirements."""
+import subprocess
+import sys
+import shutil
+from pathlib import Path
 
 import numpy as np
 import rasterio
-from rasterio.transform import from_bounds
-from pathlib import Path
-from src.main import process_image
-from src.config import DEFAULT_SAVI_L
-from src.logging_config import setup_logging
+from rasterio.transform import from_origin
+import pytest
 
 
-def test_full_workflow(tmp_path: Path) -> None:
-    """Tests the complete system workflow with simulated satellite data.
-
-    Verifies image processing, index calculation, and logging functionality
-    in an integrated test environment.
-
-    Args:
-        tmp_path: Temporary directory provided by pytest
+# ------------------------------------------------------------------ #
+# --------- Generar un TIFF sintético 6‐bandas de 2×2 píxeles -------- #
+# ------------------------------------------------------------------ #
+def create_multiband_tif_for_workflow(path: Path) -> None:
     """
-    # Configurar directorios de prueba
-    input_dir = tmp_path / "input"
-    input_dir.mkdir()
-    output_dir = tmp_path / "output"
-    output_dir.mkdir()
+    Crea un TIFF de 6 bandas, 2×2 píxeles, con valores distintos
+    en cada píxel para asegurar que K-Means pueda generar ≥2 clusters.
+    """
+    # Construimos un arreglo 6×2×2 con valores 0…23
+    data = np.arange(6 * 2 * 2, dtype=np.float32).reshape(6, 2, 2)
 
-    # Crear imagen de prueba
-    test_image_path = input_dir / "test.tif"
-    red_band = np.ones((10, 10), dtype=np.float32) * 0.3  # Simulando reflectancia roja
-    nir_band = np.ones((10, 10), dtype=np.float32) * 0.8  # Simulando reflectancia NIR
-
-    # Crear archivo multiespectral
-    profile = {
+    transform = from_origin(0, 2, 1, 1)  # (west, north, xsize, ysize)
+    meta = {
         "driver": "GTiff",
-        "width": 10,
-        "height": 10,
-        "count": 2,
+        "height": 2,
+        "width": 2,
+        "count": 6,
         "dtype": "float32",
-        "crs": "EPSG:4326",
-        "transform": from_bounds(0, 0, 1, 1, 10, 10),
+        "crs": "EPSG:32719",
+        "transform": transform,
     }
 
-    with rasterio.open(test_image_path, "w", **profile) as dst:
-        dst.write(red_band, 1)  # Banda roja
-        dst.write(nir_band, 2)  # Banda NIR
-        dst.update_tags(1, wavelength_nm=665)  # Rojo
-        dst.update_tags(2, wavelength_nm=842)  # NIR
+    # Pasamos la ruta como str() y mode="w" para evitar advertencias de stub
+    with rasterio.open(str(path), mode="w", **meta) as dst:
+        for i in range(6):
+            dst.write(data[i], i + 1)
 
-    # Configurar logging
-    setup_logging(output_dir)
 
-    # Procesar imagen con índices por defecto
-    indices_to_calculate = ["ndvi", f"savi_{DEFAULT_SAVI_L}"]
-    result_paths = process_image(
-        test_image_path, output_dir, indices=indices_to_calculate
+# ------------------------------------------------------------------ #
+# ---------------- Repo temporal con setup.py mínimo ---------------- #
+# ------------------------------------------------------------------ #
+@pytest.fixture
+def git_root(tmp_path):
+    """
+    Replica la estructura mínima necesaria para que
+    `python -m pascal_zoning.pipeline run …` funcione aislado.
+    """
+    project_dir = tmp_path / "integration_proj"
+    project_dir.mkdir()
+
+    # Copiamos src/pascal_zoning a integration_proj/src/pascal_zoning
+    src_original = Path(__file__).parents[2] / "src" / "pascal_zoning"
+    dst_src = project_dir / "src" / "pascal_zoning"
+    dst_src.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src_original, dst_src)
+
+    # Creamos un setup.py mínimo para que `python -m pascal_zoning.pipeline` funcione
+    (project_dir / "setup.py").write_text(
+        "from setuptools import setup, find_packages\n"
+        "setup(\n"
+        "    name='pascal_zoning',\n"
+        "    version='0.1',\n"
+        "    packages=find_packages('src'),\n"
+        "    package_dir={'': 'src'},\n"
+        ")\n"
     )
 
-    # Verificar resultado
-    assert isinstance(result_paths, dict)
-    assert len(result_paths) == len(indices_to_calculate)
-    assert all(isinstance(path, Path) for path in result_paths.values())
-    assert all(path.parent == output_dir for path in result_paths.values())
+    return project_dir
 
-    # Verificar valores de NDVI
-    with rasterio.open(result_paths["ndvi"]) as src:
-        ndvi = src.read(1)
-        expected_ndvi = (0.8 - 0.3) / (0.8 + 0.3)  # (NIR - RED) / (NIR + RED)
-        np.testing.assert_allclose(ndvi, expected_ndvi, rtol=1e-3)
+
+# ------------------------------------------------------------------ #
+# -------------------  TEST de flujo completo ---------------------- #
+# ------------------------------------------------------------------ #
+def test_cli_workflow_creates_outputs(git_root, tmp_path):
+    """
+    Invoca la CLI real (`python -m pascal_zoning.pipeline run …`) con un TIFF pequeño.
+    Comprueba que el proceso termine sin error y que aparezcan los archivos esperados.
+    """
+    # 1) Crear carpeta `inputs` y el TIFF sintético
+    inputs_dir = git_root / "inputs"
+    inputs_dir.mkdir()
+    tif_path = inputs_dir / "predio_recortado_multiband.tif"
+    create_multiband_tif_for_workflow(tif_path)
+
+    # 2) Definir directorio de salida
+    outputs_dir = tmp_path / "integration_outputs"
+
+    # 3) Construir el comando CLI con la firma actual:
+    #    pascal_zoning.pipeline run --raster … --indices … --output-dir … --force-k … --min-zone-size …
+    cmd = [
+        sys.executable,
+        "-m", "pascal_zoning.pipeline",
+        "run",
+        "--raster", str(tif_path),
+        "--output-dir", str(outputs_dir),
+        "--indices", "NDVI,NDWI,NDRE,SI",
+        "--force-k", "2",                  
+        "--min-zone-size", "0.00005",      
+    ]
+
+    proc = subprocess.run(
+        cmd,
+        cwd=str(git_root),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    # Si el código de retorno no es 0, mostramos stderr para depurar
+    assert proc.returncode == 0, f"CLI devolvió error:\n{proc.stderr}"
+
+    # 4) “outputs_dir” contendrá subdirectorios timestamped como:
+    #      outputs/20250604_193139_k2_mz0.00005/
+    #    Capturamos el primer (y único) directorio creado allí:
+    timestamped_dirs = [d for d in outputs_dir.iterdir() if d.is_dir()]
+    assert timestamped_dirs, "No se creó ningún subdirectorio dentro de outputs_dir"
+    exec_dir = timestamped_dirs[0]
+
+    # 5) Comprobamos los nombres reales de los archivos dentro de ese subdir
+    expected = {
+        "zonificacion_agricola.gpkg",
+        "puntos_muestreo.gpkg",
+        "mapa_clusters.png",
+        "estadisticas_zonas.csv",
+        "metricas_clustering.json",
+        "zonificacion_results.png",  # incluye el PNG de resumen
+    }
+    produced = {p.name for p in exec_dir.iterdir() if p.is_file()}
+    missing = expected - produced
+    assert not missing, f"Faltan archivos en {exec_dir}: {missing}"
+
+
+

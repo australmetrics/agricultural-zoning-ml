@@ -23,252 +23,90 @@ The module requires the following core libraries:
 
 ## Installation Methods
 
-### Method 1: Standard Installation (Recommended)
+# Installation
 
-#### Step 1: Clone the Repository
+This section explains how to install PASCAL Agri-Zoning (`pascal_zoning`), including all required dependencies.
+
+## 1. Prerequisites
+
+Before installing, ensure you have:
+- **Python 3.8+**  
+- A working **geospatial environment** capable of building and running:
+  - [rasterio](https://pypi.org/project/rasterio/)  
+  - [geopandas](https://pypi.org/project/geopandas/)  
+  - [shapely](https://pypi.org/project/Shapely/)  
+- **GDAL** installed on your system (required by `rasterio` and `geopandas`). Confirm that `gdalinfo --version` prints a valid version.
+
+Example (Ubuntu/Debian):
 ```bash
-# Clone the repository
-git clone https://github.com/australmetrics/pascal-ndvi-block.git
-cd pascal-ndvi-block
+sudo apt-get update
+sudo apt-get install -y gdal-bin libgdal-dev
 ```
 
-#### Step 2: Create Virtual Environment
-**Linux/macOS:**
+Example (macOS with Homebrew):
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+brew install gdal
 ```
 
-**Windows (Command Prompt):**
-```cmd
-python -m venv venv
-venv\Scripts\activate
-```
-
-**Windows (PowerShell):**
-```powershell
-python -m venv venv
-venv\Scripts\Activate.ps1
-```
-
-#### Step 3: Install Dependencies
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-#### Step 4: Configure Environment
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit configuration (use your preferred editor)
-nano .env  # Linux/macOS
-notepad .env  # Windows
-```
-
-#### Step 5: Verify Installation
-```bash
-python -m src.main --help
-```
-
-### Method 2: Development Installation
-
-For contributors or advanced users who need access to development tools:
+## 2. Create or Activate a Virtual Environment (Highly Recommended)
 
 ```bash
-# Clone repository
-git clone https://github.com/australmetrics/pascal-ndvi-block.git
-cd pascal-ndvi-block
-
-# Create virtual environment
-python -m venv venv-dev
-source venv-dev/bin/activate  # Linux/macOS
-# or venv-dev\Scripts\activate  # Windows
-
-# Install with development dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt  # If available
-
-# Install pre-commit hooks (for contributors)
-pre-commit install
+python3 -m venv pascal-env
+source pascal-env/bin/activate
 ```
 
-## Platform-Specific Instructions
+## 3. Install via pip (PyPI)
 
-### Windows Installation
+If PASCAL Agri-Zoning is available on PyPI:
+```bash
+pip install pascal-zoning
+```
 
-#### Prerequisites
-1. **Python Installation**: Download from [python.org](https://python.org) or use Microsoft Store
-2. **Visual C++ Build Tools**: Required for some dependencies
-   ```cmd
-   # Install using chocolatey (if available)
-   choco install visualstudio2019buildtools
+This will pull in the latest release from PyPI, including all required dependencies.
+
+**Tip:** If you encounter any errors related to `rasterio` or `geopandas`, double-check that GDAL is installed and that your environment's PATH or LD_LIBRARY_PATH includes the GDAL libraries.
+
+### 3.1. Verifying Installation
+
+After installation, verify that you can import the library in Python:
+```python
+>>> import pascal_zoning
+>>> pascal_zoning.__version__
+'1.0.0'   # or the version you installed
+```
+
+If the import succeeds without errors, you're good to proceed.
+
+## 4. Install from Source (GitHub)
+
+If you prefer to install the latest development version or contribute to the project:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-organization/pascal-zoning.git
+   cd pascal-zoning
    ```
 
-#### GDAL Configuration (if needed)
-Some rasterio installations may require GDAL:
-```cmd
-# Using conda (recommended for Windows)
-conda install -c conda-forge gdal
-```
+2. Build and install:
+   ```bash
+   pip install .
+   ```
+   
+   or, to install in "editable" (development) mode:
+   ```bash
+   pip install --editable .
+   ```
 
-### Linux Installation (Ubuntu/Debian)
+3. Verify import as above:
+   ```bash
+   python -c "import pascal_zoning; print(pascal_zoning.__version__)"
+   ```
 
-#### System Dependencies
+## 5. Optional: Install Visualization Dependencies
+
+To generate advanced plots (e.g., using matplotlib), confirm you have:
 ```bash
-# Update package manager
-sudo apt update
-
-# Install system dependencies
-sudo apt install python3-pip python3-venv
-sudo apt install gdal-bin libgdal-dev
-sudo apt install python3-dev build-essential
-
-# Set GDAL environment variables
-export CPLUS_INCLUDE_PATH=/usr/include/gdal
-export C_INCLUDE_PATH=/usr/include/gdal
+pip install matplotlib
 ```
 
-### macOS Installation
-
-#### Using Homebrew (Recommended)
-```bash
-# Install Homebrew (if not installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install dependencies
-brew install python gdal
-```
-
-#### Using MacPorts
-```bash
-sudo port install gdal +python39
-```
-
-## Configuration Setup
-
-### Environment Variables
-
-Edit the `.env` file with your specific configuration:
-
-```bash
-# User identification (for audit logs)
-USERNAME=your_username
-
-# Logging configuration
-LOG_LEVEL=INFO
-
-# Optional: Custom paths
-DATA_PATH=data/
-RESULTS_PATH=results/
-```
-
-### Directory Structure Verification
-
-After installation, verify the directory structure:
-```
-pascal-ndvi-block/
-├── data/                 # Input imagery (create if missing)
-├── results/             # Output results (auto-created)
-│   └── logs/           # ISO 42001 audit logs
-├── src/                # Source code
-├── tests/              # Unit tests
-├── .env               # Configuration (you created this)
-└── requirements.txt   # Dependencies
-```
-
-## Verification Tests
-
-### Basic Functionality Test
-```bash
-# Test CLI access
-python -m src.main --version
-
-# Test with help command
-python -m src.main --help
-```
-
-### Sample Data Test (if available)
-```bash
-# Create test directories
-mkdir -p data results
-
-# Run with sample data (if provided)
-python -m src.main indices --image=data/sample.tif
-```
-
-## Troubleshooting Installation
-
-### Common Issues
-
-#### Issue: "ModuleNotFoundError: No module named 'rasterio'"
-**Solution:**
-```bash
-# Ensure virtual environment is activated
-source venv/bin/activate  # Linux/macOS
-# or venv\Scripts\activate  # Windows
-
-# Reinstall dependencies
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-#### Issue: GDAL Installation Problems
-**Windows:**
-```bash
-# Use conda instead of pip
-conda install -c conda-forge rasterio geopandas
-```
-
-**Linux:**
-```bash
-# Install system GDAL first
-sudo apt install gdal-bin libgdal-dev
-export GDAL_VERSION=$(gdal-config --version)
-pip install GDAL==$GDAL_VERSION
-```
-
-#### Issue: Permission Errors (Windows)
-**Solution:**
-- Run Command Prompt/PowerShell as Administrator
-- Or use `--user` flag: `pip install --user -r requirements.txt`
-
-### Environment Validation
-
-Create a simple test script to validate your installation:
-
-```python
-# test_installation.py
-try:
-    import rasterio
-    import geopandas
-    import numpy
-    import typer
-    import loguru
-    print("✓ All dependencies successfully imported")
-    print("✓ Installation completed successfully")
-except ImportError as e:
-    print(f"✗ Missing dependency: {e}")
-```
-
-Run with: `python test_installation.py`
-
-## Next Steps
-
-After successful installation:
-
-1. **Read Quick Start Guide**: `docs/user_guide/quick_start.md`
-2. **Explore Examples**: `docs/examples/basic_usage.md`
-3. **Configure Logging**: Review ISO 42001 compliance features
-4. **Prepare Data**: Place satellite imagery in `data/` directory
-
-## Support
-
-- **Installation Issues**: Create GitHub issue with system details
-- **Dependency Conflicts**: Check `requirements.txt` compatibility
-- **Platform-Specific Problems**: Include OS version and Python version in reports
-
----
-
-**Note**: This installation follows ISO 42001 principles by providing clear, traceable installation procedures with comprehensive logging and validation steps.
+The viz module uses matplotlib, geopandas, and shapely. If you plan to run the zoning_overview routine, ensure these are installed.

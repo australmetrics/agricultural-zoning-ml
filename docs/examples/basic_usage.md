@@ -1,311 +1,320 @@
-# Basic Usage Examples
+# Basic Usage
 
-© 2025 AustralMetrics SpA. All rights reserved.
-
-This document provides practical examples for common use cases of the PASCAL NDVI Block module, designed for users who want to understand the basic functionality through real-world scenarios.
-
-## Overview
-
-PASCAL NDVI Block is designed around three core operations:
-- **Index Calculation**: Generate vegetation indices from satellite imagery
-- **Image Clipping**: Extract specific areas of interest
-- **Automated Processing**: Complete workflows with minimal commands
-
-All examples follow ISO 42001 compliance principles with full audit trails and reproducible results.
-
-## Example 1: Basic Vegetation Index Calculation
-
-### Scenario
-You have a Sentinel-2 image of an agricultural area and want to calculate vegetation health indices.
-
-### Input Data
-```
-data/
-├── farm_sentinel2_20240515.tif    # Sentinel-2 L2A image
-```
-
-### Command
-```bash
-python -m src.main indices --image=data/farm_sentinel2_20240515.tif
-```
-
-### Expected Output
-```
-results/
-├── farm_sentinel2_20240515_ndvi.tif    # NDVI index (-1 to +1)
-├── farm_sentinel2_20240515_ndre.tif    # NDRE index (-1 to +1)
-├── farm_sentinel2_20240515_savi.tif    # SAVI index (-1 to +1)
-└── logs/
-    ├── pascal_ndvi_20240515_143022.log  # Processing log
-    └── pascal_ndvi_20240515_143022.log.sha256  # Integrity hash
-```
-
-### Understanding Results
-- **NDVI > 0.5**: Dense, healthy vegetation (mature crops)
-- **NDVI 0.2-0.5**: Moderate vegetation (young crops, grassland)
-- **NDVI < 0.2**: Sparse or no vegetation (bare soil, water)
-
-### Log Content
-```
-2024-05-15 14:30:22 | INFO | Starting NDVI processing for farm_sentinel2_20240515.tif
-2024-05-15 14:30:23 | INFO | Detected bands: B04 (Red), B08 (NIR), B05 (Red Edge)
-2024-05-15 14:30:25 | INFO | NDVI calculation completed successfully
-2024-05-15 14:30:26 | INFO | NDRE calculation completed successfully
-2024-05-15 14:30:27 | INFO | SAVI calculation completed successfully
-2024-05-15 14:30:27 | INFO | Processing complete. Results saved to results/
-```
-
-## Example 2: Processing with Area of Interest
-
-### Scenario
-You have a large Landsat image but only need to analyze a specific watershed area defined by a shapefile.
-
-### Input Data
-```
-data/
-├── landsat8_region.tif        # Large Landsat 8 scene
-└── watershed_boundary.shp     # Study area boundary
-    ├── watershed_boundary.shx
-    ├── watershed_boundary.dbf
-    └── watershed_boundary.prj
-```
-
-### Step-by-Step Processing
-
-#### Step 1: Clip to Area of Interest
-```bash
-python -m src.main clip --image=data/landsat8_region.tif --shapefile=data/watershed_boundary.shp
-```
-
-#### Step 2: Calculate Indices on Clipped Area
-```bash
-python -m src.main indices --image=results/landsat8_region_clipped.tif
-```
-
-### Alternative: Single Command
-```bash
-python -m src.main auto --image=data/landsat8_region.tif --shapefile=data/watershed_boundary.shp
-```
-
-### Expected Output
-```
-results/
-├── landsat8_region_clipped.tif           # Clipped image
-├── landsat8_region_clipped_ndvi.tif      # NDVI for watershed only
-├── landsat8_region_clipped_ndre.tif      # NDRE for watershed only
-├── landsat8_region_clipped_savi.tif      # SAVI for watershed only
-└── logs/
-    └── pascal_ndvi_[timestamp].log       # Complete processing log
-```
-
-## Example 3: Custom Output Directory
-
-### Scenario
-You're processing multiple projects and need organized output directories.
-
-### Command
-```bash
-python -m src.main indices --image=data/project_alpha.tif --output=results/project_alpha_analysis
-```
-
-### Expected Output
-```
-results/
-└── project_alpha_analysis/
-    ├── project_alpha_ndvi.tif
-    ├── project_alpha_ndre.tif
-    ├── project_alpha_savi.tif
-    └── logs/
-        └── pascal_ndvi_[timestamp].log
-```
-
-## Example 4: Batch Processing Multiple Images
-
-### Scenario
-You have multiple images from different dates and want to process them all.
-
-### Input Data
-```
-data/
-├── field_20240401.tif
-├── field_20240501.tif
-├── field_20240601.tif
-└── field_20240701.tif
-```
-
-### Bash Script (Linux/macOS)
-```bash
-#!/bin/bash
-for image in data/field_*.tif; do
-    echo "Processing $image..."
-    python -m src.main indices --image="$image" --output="results/$(basename "$image" .tif)_analysis"
-done
-```
-
-### PowerShell Script (Windows)
-```powershell
-Get-ChildItem data\field_*.tif | ForEach-Object {
-    Write-Host "Processing $($_.Name)..."
-    python -m src.main indices --image="$($_.FullName)" --output="results\$($_.BaseName)_analysis"
-}
-```
-
-### Expected Output
-```
-results/
-├── field_20240401_analysis/
-│   ├── field_20240401_ndvi.tif
-│   ├── field_20240401_ndre.tif
-│   └── field_20240401_savi.tif
-├── field_20240501_analysis/
-│   └── [similar structure]
-└── [additional dates...]
-```
-
-## Example 5: Working with Different Satellite Types
-
-### Sentinel-2 Processing
-```bash
-# Sentinel-2 L1C or L2A images
-python -m src.main indices --image=data/S2A_MSIL2A_20240515T103031_N0510_R108_T32TQM_20240515T135516.tif
-```
-
-### Landsat 8/9 Processing
-```bash
-# Landsat Collection 2 images
-python -m src.main indices --image=data/LC08_L2SP_123032_20240515_20240517_02_T1.tif
-```
-
-### Generic GeoTIFF Processing
-```bash
-# Any multi-band GeoTIFF with appropriate bands
-python -m src.main indices --image=data/multispectral_image.tif
-```
-
-## Example 6: Quality Control and Verification
-
-### Verify Processing Success
-```bash
-# Check if all expected outputs were created
-ls results/*_ndvi.tif results/*_ndre.tif results/*_savi.tif
-
-# Verify file integrity
-sha256sum results/logs/*.sha256
-```
-
-### Review Processing Logs
-```bash
-# View complete processing log
-cat results/logs/pascal_ndvi_*.log
-
-# Search for any errors or warnings
-grep -i "error\|warning" results/logs/*.log
-
-# Check processing statistics
-grep "Processing complete" results/logs/*.log
-```
-
-### Validate Results
-```bash
-# Check image properties with GDAL
-gdalinfo results/my_image_ndvi.tif
-
-# Verify coordinate system
-gdalsrsinfo results/my_image_ndvi.tif
-```
-
-## Example 7: Memory-Efficient Processing
-
-### For Large Images
-```bash
-# Process with memory optimization (if supported)
-python -m src.main indices --image=data/large_image.tif --output=/tmp/fast_storage
-```
-
-### Monitor System Resources
-```bash
-# Linux/macOS: Monitor during processing
-top -p $(pgrep -f "python.*src.main")
-
-# Windows: Use Task Manager or PowerShell
-Get-Process python | Select-Object ProcessName, CPU, WorkingSet
-```
-
-## Understanding Command Options
-
-### Common Parameters
-
-| Parameter | Required | Description | Example Values |
-|-----------|----------|-------------|----------------|
-| `--image` | Yes | Input satellite image | `data/image.tif` |
-| `--shapefile` | No | Clipping boundary | `data/boundary.shp` |
-| `--output` | No | Output directory | `results/project1` |
-
-### Help and Documentation
-```bash
-# General help
-python -m src.main --help
-
-# Command-specific help
-python -m src.main indices --help
-python -m src.main clip --help
-python -m src.main auto --help
-```
-
-## Error Handling Examples
-
-### Common Issues and Solutions
-
-#### Missing Input File
-```bash
-# Command that will fail
-python -m src.main indices --image=data/nonexistent.tif
-
-# Error message guides you to the solution
-# ERROR: Input file 'data/nonexistent.tif' not found
-```
-
-#### Invalid Shapefile
-```bash
-# Missing shapefile components
-python -m src.main clip --image=data/image.tif --shapefile=data/incomplete.shp
-
-# Error message indicates missing files (.shx, .dbf, .prj)
-```
-
-#### Insufficient Disk Space
-```bash
-# Check available space before processing
-df -h results/  # Linux/macOS
-Get-WmiObject -Class Win32_LogicalDisk  # Windows PowerShell
-```
-
-## Best Practices
-
-### File Organization
-```
-project/
-├── data/
-│   ├── raw_imagery/      # Original satellite images
-│   └── boundaries/       # Shapefiles for clipping
-├── results/
-│   ├── 2024_q1/         # Organized by time period
-│   ├── 2024_q2/
-│   └── final_analysis/   # Processed results
-└── scripts/
-    └── batch_process.sh  # Automation scripts
-```
-
-### Naming Conventions
-- Use descriptive filenames: `farm_field1_sentinel2_20240515.tif`
-- Include dates in ISO format: `YYYYMMDD`
-- Separate project phases: `preliminary_`, `final_`
-
-### Documentation
-- Keep processing logs for audit trails
-- Document coordinate systems and projections
-- Record processing parameters for reproducibility
+This guide expands on **Simple Usage** by showing additional CLI flags, configuration file support, environment‐variable overrides, and richer Python‐API options. We assume you have Pascal Zoning ML installed (either via `pip install -e .` or from PyPI) and a working GeoTIFF or precomputed index arrays.
 
 ---
 
-These examples demonstrate the core functionality of PASCAL NDVI Block while maintaining full ISO 42001 compliance through comprehensive logging and audit trails. Each operation is designed to be simple, reliable, and fully traceable for professional remote sensing workflows.
+## 1. Environment Variables & Config File
+
+Pascal Zoning ML can read default settings from environment variables or a `config.yaml` file. CLI flags override configuration entries, and configuration entries override environment variables.
+
+### 1.1 Environment Variables
+
+You can set these in your shell before invoking the CLI or Python API. For example:
+
+```bash
+# Set default logging level
+export ZONING_LOG_LEVEL="DEBUG"
+
+# Set a default output directory (if you omit --output-dir in the CLI)
+export ZONING_OUTPUT_DIR="/path/to/outputs"
+
+# Limit RAM used (if supported by your environment)
+export ZONING_MAX_MEMORY_GB="16"
+```
+
+Pascal Zoning ML will pick up these environment variables automatically at runtime (via Typer and internal logic).
+
+### 1.2 config.yaml
+
+Create a file named `config.yaml` in your project root with the following structure:
+
+```yaml
+zoning:
+  random_state: 123
+  min_zone_size_ha: 0.2
+  max_zones: 8
+  use_pca: true
+
+clustering:
+  # (These are advanced parameters if exposed later)
+  n_init: 10
+  max_iter: 300
+
+sampling:
+  points_per_zone: 5
+  min_distance_m: 10.0
+
+io:
+  # These sections are purely illustrative; currently only CLI flags matter
+  default_output_dir: "./outputs/from_config"
+```
+
+When you run the CLI with `--config config.yaml`, Pascal Zoning ML will read these defaults and then apply any CLI overrides you supply.
+
+## 2. Command‐Line Interface (CLI) Examples
+
+### 2.1 Using a config file + overriding flags
+
+Suppose you have:
+- `config.yaml` as shown above
+- A GeoTIFF at `./inputs/field_clip.tif` (EPSG:32719, 5 bands: SWIR, NIR, RED_EDGE, RED, GREEN)
+
+Run:
+
+```bash
+python -m pascal_zoning.pipeline run \
+  --config config.yaml \
+  --raster ./inputs/field_clip.tif \
+  --indices NDVI,NDRE \
+  --force-k 4 \
+  --output-dir ./outputs/cli_basic
+```
+
+What happens?
+
+**Load defaults from config.yaml:**
+- `random_state = 123`
+- `min_zone_size_ha = 0.2`
+- `max_zones = 8`
+- `use_pca = true`
+- `points_per_zone = 5` (from sampling)
+
+**CLI overrides:**
+- `--indices NDVI,NDRE` (compute only those two indices)
+- `--force-k 4` (force exactly 4 clusters)
+- `--output-dir ./outputs/cli_basic`
+
+Output will go into a timestamped subfolder under `./outputs/cli_basic`.
+
+### 2.2 Specifying only environment variables
+
+If you export:
+
+```bash
+export ZONING_OUTPUT_DIR="./outputs/env_basic"
+export ZONING_LOG_LEVEL="INFO"
+```
+
+and then run:
+
+```bash
+python -m pascal_zoning.pipeline run \
+  --raster ./inputs/field_clip.tif \
+  --indices NDVI,NDWI,NDRE,SI \
+  --max-zones 6
+```
+
+Because `--output-dir` is omitted, Pascal Zoning ML writes to `$ZONING_OUTPUT_DIR/YYYYMMDD_HHMMSS_kAUTO_mz0.5` (default `min_zone_size_ha = 0.5` unless overridden).
+
+- Logging will honor INFO level (less verbose than DEBUG).
+- `k` is chosen automatically from 2..6.
+
+### 2.3 Saving intermediate files
+
+By default, Pascal Zoning ML only writes final outputs into the timestamped folder. To keep intermediate artifacts (such as the raw mask, feature matrix, or raw cluster labels), set the environment variable:
+
+```bash
+export ZONING_SAVE_INTERMEDIATES="true"
+```
+
+Then run:
+
+```bash
+python -m pascal_zoning.pipeline run \
+  --raster ./inputs/field_clip.tif \
+  --indices NDVI,NDWI \
+  --output-dir ./outputs/intermediates_example
+```
+
+You will find additional files inside the timestamped folder:
+
+```
+YYYYMMDD_HHMMSS_kAUTO_mz0.5/
+├── intermediate/
+│   ├── valid_mask.npy
+│   ├── feature_matrix.npy
+│   ├── cluster_labels.npy
+│   └── zones_raw.geojson
+├── zonificacion_agricola.gpkg
+├── puntos_muestreo.gpkg
+... (rest of final outputs) ...
+```
+
+*(Note: Pascal Zoning ML may require implementation of `save_intermediates()`—check future versions.)*
+
+## 3. Python API Examples
+
+### 3.1 Custom sampling strategy
+
+By default, `points_per_zone` is fixed. You can override it per‐zone or apply a minimum distance constraint:
+
+```python
+from pathlib import Path
+import numpy as np
+import geopandas as gpd
+from pascal_zoning.zoning import AgriculturalZoning, ZoningResult, ClusterMetrics, ZoneStats
+
+# Pre‐computed indices (e.g., 100×100 arrays)
+ndvi = np.load("data/ndvi.npy")
+ndwi = np.load("data/ndwi.npy")
+ndre = np.load("data/ndre.npy")
+si   = np.load("data/si.npy")
+
+indices = {
+    "NDVI": ndvi,
+    "NDWI": ndwi,
+    "NDRE": ndre,
+    "SI": si
+}
+
+# Load a boundary from GeoPackage
+field_gdf = gpd.read_file("data/field_boundary.gpkg")
+bounds_polygon = field_gdf.geometry.iloc[0]
+
+# Instantiate engine with PCA enabled and a custom random_state
+zoning = AgriculturalZoning(
+    random_state=2023,
+    min_zone_size_ha=0.1,
+    max_zones=5,
+    output_dir=Path("outputs/api_basic")
+)
+
+# Run, but change points_per_zone to 10, enable PCA, and let k be automatic
+result: ZoningResult = zoning.run_pipeline(
+    indices=indices,
+    bounds=bounds_polygon,
+    points_per_zone=10,
+    crs="EPSG:32719",
+    force_k=None,     # auto‐select k
+    use_pca=True      # turn on PCA
+)
+
+# Post‐process: filter out any sample points that lie too close (< 5 m) to each other
+samples_gdf = result.samples.copy()
+samples_gdf = samples_gdf[samples_gdf.geometry.apply(lambda p: p.distance(p) >= 5.0)]
+
+# Print summary
+print(f"Chosen k = {result.metrics.n_clusters}")
+print(f"Zone areas (ha): {[s.area_ha for s in result.stats]}")
+```
+
+### 3.2 Programmatic Configuration
+
+Rather than using environment variables or CLI flags, you can programmatically assign default parameters:
+
+```python
+from pascal_zoning.config import ZoningConfig
+from pascal_zoning.zoning import AgriculturalZoning
+
+# Create a config object (matching config.yaml schema)
+app_config = ZoningConfig(
+    zoning={
+        "random_state": 555,
+        "min_zone_size_ha": 0.3,
+        "max_zones": 6,
+        "use_pca": False
+    },
+    sampling={
+        "points_per_zone": 8,
+        "min_distance_m": None
+    }
+)
+
+# Instantiate using the config directly
+zoning = AgriculturalZoning.from_config(app_config)
+# (Assumes `from_config` static method reads the dictionary and sets attributes)
+
+# Proceed as normal with zoning.run_pipeline(...)
+```
+
+*(Note: The `ZoningConfig` class and `.from_config()` method may require you to implement them or consult the `config.py` file.)*
+
+## 4. Common Advanced Options
+
+### 4.1 Changing PCA variance ratio
+
+By default, PCA retains 95% of variance. To adjust:
+
+```bash
+python -m pascal_zoning.pipeline run \
+  --raster ./inputs/field_clip.tif \
+  --indices NDVI,NDWI,NDRE,SI \
+  --output-dir ./outputs/basic_pca \
+  --use-pca \
+  --pca-variance 0.90
+```
+
+*(Note: The `--pca-variance` flag must be implemented in `pipeline.py` to override `PCA(n_components=variance)`. If not yet available, you can modify `zoning.pca` manually in code.)*
+
+### 4.2 Logging to a file
+
+To save logs to disk (ISO 42001 traceability):
+
+```bash
+python -m pascal_zoning.pipeline run \
+  --raster ./inputs/field_clip.tif \
+  --indices NDVI,NDWI,NDRE,SI \
+  --output-dir ./outputs/logging_example \
+  --log-file ./outputs/logging_example/run.log
+```
+
+This assumes the CLI supports `--log-file <path>` to write Loguru output. Otherwise, set:
+
+```bash
+export ZONING_LOG_FILE="./outputs/logging_example/run.log"
+```
+
+and Pascal Zoning ML will detect and write to that file.
+
+## 5. Input/Output Tracking
+
+When you run a "basic" or "advanced" example, Pascal Zoning ML will generate a JSON "manifest" of inputs and outputs for auditing. The default filename is `manifest_zoning.json` within the timestamped folder:
+
+```json
+{
+  "name": "pascal-zoning-ml",
+  "version": "0.1.0",
+  "timestamp": "2025-06-04T15:23:10Z",
+  "interfaces": {
+    "input": {
+      "raster": "./inputs/field_clip.tif",
+      "indices": ["NDVI", "NDRE"]
+    },
+    "output": {
+      "geopackages": {
+        "zonificacion_agricola": "zonificacion_agricola.gpkg",
+        "puntos_muestreo": "puntos_muestreo.gpkg"
+      },
+      "csv": "estadisticas_zonas.csv",
+      "json": "metricas_clustering.json",
+      "png": {
+        "mapa_ndvi": "mapa_ndvi.png",
+        "mapa_clusters": "mapa_clusters.png",
+        "zonificacion_results": "zonificacion_results.png"
+      },
+      "log": "pipeline_run.log"
+    }
+  },
+  "metadata": {
+    "processing_time": 12.345,
+    "software_version": "0.1.0"
+  }
+}
+```
+
+Use this manifest to provide ISO 42001–compliant traceability:
+- Timestamps
+- Parameter lists
+- Exact file paths
+
+## 6. Summary
+
+- **Simple Usage** is best for first‐time runs.
+- **Basic Usage** introduces configuration files, environment variables, and more CLI flags.
+- **Advanced Usage** (see `advanced_examples.md`) covers multi‐field batch runs, custom cluster metrics export, and integration with downstream analytics.
+
+For additional details on coding patterns, configuration conventions, and ISO 42001 traceability, consult the following:
+- `advanced_examples.md`
+- `iso42001_compliance.md`
+- `normative_dependencies.md`

@@ -28,11 +28,11 @@ If applicable, add log files to help explain your problem.
  - Python Version: [e.g. 3.9]
  - Package Version: [e.g. 1.0.1]
 
-**ISO 42001 Impact Assessment**
-- [ ] Data integrity affected
-- [ ] Processing traceability compromised
-- [ ] Output validation issues
-- [ ] Log consistency problems
+**System Configuration**
+- [ ] Configuration files checked
+- [ ] Permissions verified
+- [ ] Dependencies up to date
+- [ ] Environment variables set correctly
 
 **Additional context**
 Add any other context about the problem here.

@@ -1,47 +1,121 @@
 {
-    "name": "PASCAL NDVI Block",
-    "version": "1.0.3",
-    "description": "CLI tool for satellite image processing to calculate NDVI, NDRE and SAVI with ISO 42001 traceability",
-    "interfaces": {
-        "input": {
-            "raster": {
-                "type": "GeoTIFF",
-                "bands": ["RED", "NIR"],
-                "validation": {
-                    "required": true,
-                    "format": ["*.tif", "*.tiff"]
-                }
-            },
-            "parameters": {
-                "index": {
-                    "type": "string",
-                    "enum": ["ndvi", "savi"],
-                    "default": "ndvi"
-                },
-                "L": {
-                    "type": "number",
-                    "description": "Soil brightness correction factor for SAVI",
-                    "minimum": 0,
-                    "maximum": 1,
-                    "default": 0.5
-                }
-            }
+  "name": "PASCAL Zoning ML",
+  "version": "0.1.0",
+  "description": "CLI and API for agricultural zoning and optimized sampling point generation based on spectral indices, with ISO 42001 traceability.",
+  "interfaces": {
+    "input": {
+      "raster": {
+        "type": "GeoTIFF",
+        "bands": ["SWIR", "NIR", "RED_EDGE", "RED", "GREEN"],
+        "validation": {
+          "required": true,
+          "format": ["*.tif", "*.tiff"]
         },
-        "output": {
-            "raster": {
-                "type": "GeoTIFF",
-                "bands": ["INDEX"],
-                "validation": {
-                    "format": "*.tif"
-                }
-            },
-            "log": {
-                "type": "file",
-                "format": "*.log",
-                "validation": {
-                    "schema": "ISO42001"
-                }
-            }
-        }
+        "description": "Clipped GeoTIFF of the field (all bands needed for NDVI, NDWI, NDRE, SI)."
+      },
+      "indices": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": ["NDVI", "NDWI", "NDRE", "SI"]
+        },
+        "validation": {
+          "required": true,
+          "minItems": 1
+        },
+        "description": "Comma-separated list of spectral indices to compute or ingest (e.g., [\"NDVI\",\"NDWI\",\"NDRE\",\"SI\"])."
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "force_k": {
+            "type": ["integer", "null"],
+            "description": "Force K-Means to use exactly this number of clusters. If null, automatic k selection is used.",
+            "minimum": 2
+          },
+          "min_zone_size_ha": {
+            "type": "number",
+            "description": "Minimum zone area in hectares. Zones smaller than this will be filtered out.",
+            "minimum": 0,
+            "default": 0.5
+          },
+          "max_zones": {
+            "type": "integer",
+            "description": "Maximum number of clusters (zones) to evaluate automatically.",
+            "minimum": 2,
+            "default": 10
+          },
+          "points_per_zone": {
+            "type": "integer",
+            "description": "Minimum number of sampling points to generate per zone.",
+            "minimum": 1,
+            "default": 5
+          },
+          "use_pca": {
+            "type": "boolean",
+            "description": "If true, perform PCA on the stacked indices to retain 95% of variance before clustering.",
+            "default": false
+          }
+        },
+        "required": ["min_zone_size_ha", "max_zones", "points_per_zone", "use_pca"]
+      }
+    },
+    "output": {
+      "geopackages": {
+        "type": "object",
+        "properties": {
+          "zonificacion_agricola": {
+            "type": "string",
+            "format": "*.gpkg",
+            "description": "GeoPackage containing management zone polygons"
+          },
+          "puntos_muestreo": {
+            "type": "string",
+            "format": "*.gpkg",
+            "description": "GeoPackage containing sampling point geometries and index values"
+          }
+        },
+        "required": ["zonificacion_agricola", "puntos_muestreo"]
+      },
+      "csv": {
+        "type": "string",
+        "format": "*.csv",
+        "description": "CSV file with per-zone statistics (zone_id, area_ha, perimeter_m, compactness, <Index>_mean, <Index>_std)."
+      },
+      "json": {
+        "type": "string",
+        "format": "*.json",
+        "description": "JSON file containing clustering metrics (n_clusters, silhouette, calinski_harabasz, inertia, cluster_sizes, timestamp)."
+      },
+      "png": {
+        "type": "object",
+        "properties": {
+          "mapa_ndvi": {
+            "type": ["string", "null"],
+            "format": "*.png",
+            "description": "PNG of NDVI map (only if NDVI was provided)."
+          },
+          "mapa_clusters": {
+            "type": "string",
+            "format": "*.png",
+            "description": "PNG of cluster map (zones colored by cluster ID)."
+          },
+          "zonificacion_results": {
+            "type": "string",
+            "format": "*.png",
+            "description": "Composite overview PNG (cluster map + bar chart of zone areas)."
+          }
+        },
+        "required": ["mapa_clusters", "zonificacion_results"]
+      },
+      "log": {
+        "type": "string",
+        "format": "*.log",
+        "validation": {
+          "schema": "ISO42001"
+        },
+        "description": "Log file capturing detailed processing steps with timestamps for traceability."
+      }
     }
+  }
 }

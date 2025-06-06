@@ -10,13 +10,12 @@ Fixes #(issue)
 **Changes Made**
 Description of the changes in this pull request.
 
-**ISO 42001 Compliance Checklist**
-- [ ] Traceability maintained in logs
-- [ ] Input validation preserved/enhanced
-- [ ] Output validation preserved/enhanced
+**Quality Checklist**
+- [ ] Code follows project style guide
 - [ ] Documentation updated
 - [ ] Tests cover new/modified functionality
-- [ ] Test coverage > 80%
+- [ ] Code has been reviewed
+- [ ] Test coverage maintained/improved
 
 **Testing**
 - [ ] Unit tests added/updated

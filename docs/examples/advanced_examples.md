@@ -1,8 +1,203 @@
 # Advanced Examples
 
-© 2025 AustralMetrics SpA. All rights reserved.
+This document demonstrates **advanced use‐cases** of Pascal Zoning ML, including:
+
+1. Batch processing multiple fields  
+2. Custom cluster‐metrics export  
+3. Integration with downstream analytics (e.g., automated report generation)  
+4. Programmatic hooks for ISO 42001–level traceability  
+
+By the end of this guide, you'll be able to adapt the pipeline into larger workflows, export custom artifacts, and enforce quality controls.
+
+---
 
 This document provides advanced usage examples for PASCAL NDVI Block, designed for power users, researchers, and organizations requiring complex remote sensing workflows with full ISO 42001 compliance.
+
+## 1. Batch Processing Multiple Fields
+
+Often, agronomists need to run zonification on **dozens or hundreds of fields**. Instead of invoking the CLI separately, you can write a simple Python script that iterates over a list of input GeoTIFFs and processes them in parallel, while maintaining ISO 42001 traceability.
+
+### 1.1 Directory Structure
+
+Assume you have a folder tree like this:
+
+```
+project_root/
+├── inputs/
+│   ├── field_A.tif
+│   ├── field_B.tif
+│   └── field_C.tif
+├── configs/
+│   └── batch_config.yaml
+├── outputs/    # Empty initially
+└── scripts/
+    └── batch_run.py
+```
+
+- `inputs/` holds multiple GeoTIFFs, each clipped to a separate field.  
+- `configs/batch_config.yaml` contains shared parameters (e.g., `min_zone_size_ha`, `max_zones`).  
+- `scripts/batch_run.py` is our batch‐processing driver.  
+
+### 1.2 batch_config.yaml
+
+```yaml
+zoning:
+  random_state: 2025
+  min_zone_size_ha: 0.25
+  max_zones: 6
+
+sampling:
+  points_per_zone: 8
+```
+
+### 1.3 batch_run.py
+
+```python
+#!/usr/bin/env python3
+import argparse
+import glob
+import os
+from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+import geopandas as gpd
+import numpy as np
+from rasterio import open as rio_open
+
+from pascal_zoning.config import ZoningConfig
+from pascal_zoning.zoning import AgriculturalZoning
+
+def compute_spectral_indices(raster_path: Path) -> dict[str, np.ndarray]:
+    """
+    Reads a multiband GeoTIFF and computes NDVI, NDWI, NDRE, SI.
+    Assumes bands order: [SWIR, NIR, RED_EDGE, RED, GREEN].
+    """
+    with rio_open(raster_path) as src:
+        img = src.read().astype(np.float64)  # shape: (bands, H, W)
+        crs = src.crs.to_string()
+        transform = src.transform
+
+    # Bands indexing (1-based in rasterio): 
+    # SWIR = img[0], NIR = img[1], RED_EDGE = img[2], RED = img[3], GREEN = img[4]
+    def safe_div(a, b):
+        with np.errstate(divide="ignore", invalid="ignore"):
+            out = np.divide(a - b, a + b, out=np.zeros_like(a), where=(a + b) != 0)
+            return np.nan_to_num(out, nan=0.0)
+
+    indices = {
+        "NDVI": safe_div(img[1], img[3]),         # (NIR - RED)/(NIR + RED)
+        "NDWI": safe_div(img[4], img[1]),         # (GREEN - NIR)/(GREEN + NIR)
+        "NDRE": safe_div(img[1], img[2]),         # (NIR - RED_EDGE)/(NIR + RED_EDGE)
+        "SI":   safe_div(img[0], img[1]),         # (SWIR - NIR)/(SWIR + NIR)
+    }
+    return indices, crs, transform
+
+def process_single_field(
+    raster_path_str: str, 
+    config_path: str, 
+    output_base: str
+) -> str:
+    """
+    Processes one field: computes indices, runs zoning, and returns the timestamped output folder.
+    """
+    raster_path = Path(raster_path_str)
+    field_name = raster_path.stem  # e.g., "field_A"
+    output_base_dir = Path(output_base) / field_name
+    output_base_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1) Compute spectral indices
+    indices_dict, crs, transform = compute_spectral_indices(raster_path)
+
+    # 2) Build a GeoDataFrame for the field boundary (assume mask of >0 on band 1)
+    with rio_open(raster_path) as src:
+        mask_band = src.read(1)
+        # derive polygon(s) from nonzero pixels
+        from rasterio.features import shapes
+        from shapely.ops import unary_union
+        from shapely.geometry import shape as shapely_shape
+
+        geoms = []
+        for geom_geojson, val in shapes(mask_band, mask=(mask_band > 0), transform=src.transform):
+            geoms.append(shapely_shape(geom_geojson))
+        if not geoms:
+            raise RuntimeError(f"No valid pixels for field {field_name}")
+        field_polygon = unary_union(geoms)
+
+    # 3) Load shared config
+    app_config = ZoningConfig.from_yaml(config_path)
+
+    # 4) Instantiate engine from config
+    zoning = AgriculturalZoning.from_config(app_config)
+    zoning.output_dir = output_base_dir  # override per‐field
+
+    # 5) Run pipeline
+    result = zoning.run_pipeline(
+        indices=indices_dict,
+        bounds=field_polygon,
+        points_per_zone=app_config.sampling.points_per_zone,
+        crs=crs,
+        force_k=None            # let auto‐select k
+    )
+
+    return f"{field_name}: completed → {result.metrics.n_clusters} zones"
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Batch run Pascal Zoning ML on multiple fields."
+    )
+    parser.add_argument(
+        "--inputs-dir", 
+        type=str, 
+        required=True,
+        help="Directory containing input GeoTIFFs (one per field)."
+    )
+    parser.add_argument(
+        "--config", 
+        type=str, 
+        required=True,
+        help="Path to shared config.yaml"
+    )
+    parser.add_argument(
+        "--output-dir", 
+        type=str, 
+        required=True,
+        help="Base output directory for all fields."
+    )
+    parser.add_argument(
+        "--workers", 
+        type=int, 
+        default=2,
+        help="Number of parallel workers"
+    )
+    args = parser.parse_args()
+
+    rasters = glob.glob(os.path.join(args.inputs_dir, "*.tif"))
+    if not rasters:
+        print("No .tif files found in inputs dir.")
+        return
+
+    with ProcessPoolExecutor(max_workers=args.workers) as executor:
+        futures = []
+        for r in rasters:
+            futures.append(
+                executor.submit(process_single_field, r, args.config, args.output_dir)
+            )
+        for future in as_completed(futures):
+            try:
+                msg = future.result()
+                print(f"[OK] {msg}")
+            except Exception as e:
+                print(f"[ERROR] {e}")
+
+if __name__ == "__main__":
+    main()
+```
+
+Key points:
+- We use a ProcessPoolExecutor to parallelize per‐field runs.
+- Each field's outputs land under `outputs/{field_name}/YYYYMMDD_HHMMSS_k{K}_mz{min_zone_size}/`.
+- Field boundaries are derived via `rasterio.features.shapes()` → `shapely.geometry`.
+- We read a single `config.yaml` and feed into each engine via `.from_config()`.
 
 ## Advanced Processing Workflows
 
@@ -526,6 +721,464 @@ find results/ -name "*_ndvi.tif" -type f | while read raster_file; do
 done
 ```
 
----
+## 2. Custom Cluster-Metrics Export
 
-These advanced examples demonstrate the full capabilities of PASCAL NDVI Block for enterprise-level remote sensing workflows, maintaining strict ISO 42001 compliance throughout all operations with comprehensive audit trails, quality control, and integration capabilities.
+By default, Pascal Zoning ML writes a JSON (`metricas_clustering.json`) containing:
+
+```jsonc
+{
+  "n_clusters": 4,
+  "silhouette": 0.7321,
+  "calinski_harabasz": 1200.5,
+  "inertia": 350.2,
+  "cluster_sizes": { "0": 25, "1": 30, "2": 28, "3": 32 },
+  "timestamp": "2025-06-04 16:45:32"
+}
+```
+
+If you need additional metrics—for example, Davies–Bouldin score, gap statistic, or a DataFrame summarizing per‐cluster centroids—you can extend the implementation:
+
+### 2.1 Extending ClusterMetrics & adding DB score
+
+```python
+from sklearn.metrics import davies_bouldin_score
+
+@dataclass
+class ClusterMetrics:
+    n_clusters: int
+    silhouette: float
+    calinski_harabasz: float
+    inertia: float
+    cluster_sizes: Dict[int, int]
+    db_score: float               # NEW
+    timestamp: str
+
+class AgriculturalZoning:
+    # ... existing code ...
+
+    def perform_clustering(self, force_k: Optional[int] = None) -> None:
+        # existing cluster logic...
+        labels_flat = kmeans_final.labels_
+        # Compute DB score (lower is better)
+        db_score = float(davies_bouldin_score(self.features_array, labels_flat))
+        # Extend our metrics dataclass
+        self.metrics.db_score = db_score
+```
+
+In your pipeline run, after `run_pipeline()`, you can access:
+
+```python
+result = zoning.run_pipeline(...)
+print(f"Davies-Bouldin score: {result.metrics.db_score:.4f}")
+```
+
+## 3. Integration with Downstream Analytics
+
+You may want to take clustering results and auto‐generate a PDF report, populate a database, or trigger alerts. Here's an example of integrating with pandas, Matplotlib, and Jinja2 to auto‐build a PDF.
+
+### 3.1 Generating a PDF summary
+
+Install additional dependencies:
+
+```bash
+pip install pandas matplotlib jinja2 weasyprint
+```
+
+Structure:
+```
+project_root/
+├── templates/
+│   └── zoning_report.html.j2
+├── scripts/
+│   ├── batch_run.py
+│   └── generate_report.py
+└── ...
+```
+
+#### 3.1.1 templates/zoning_report.html.j2
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Pascal Zoning Report — {{ field_name }}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 1cm; }
+      h1, h2, h3 { color: #2c3e50; }
+      table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+      th { background-color: #f2f2f2; }
+      .figure { margin: 1em 0; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <h1>Pascal Zoning Report</h1>
+    <h2>Field: {{ field_name }}</h2>
+    <p><strong>Timestamp:</strong> {{ timestamp }}</p>
+
+    <h3>Clustering Summary</h3>
+    <ul>
+      <li>Number of zones: {{ metrics.n_clusters }}</li>
+      <li>Silhouette score: {{ metrics.silhouette | round(4) }}</li>
+      <li>Calinski-Harabasz index: {{ metrics.calinski_harabasz | round(2) }}</li>
+      <li>Inertia: {{ metrics.inertia | round(2) }}</li>
+      {% if metrics.db_score is defined %}
+      <li>Davies-Bouldin score: {{ metrics.db_score | round(4) }}</li>
+      {% endif %}
+    </ul>
+
+    <h3>Zone Statistics</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Zone ID</th>
+          <th>Area (ha)</th>
+          <th>Perimeter (m)</th>
+          <th>Compactness</th>
+          {% for idx in index_names %}
+          <th>{{ idx }} Mean</th>
+          <th>{{ idx }} Std</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for stat in stats_list %}
+        <tr>
+          <td>{{ stat.zone_id }}</td>
+          <td>{{ stat.area_ha | round(4) }}</td>
+          <td>{{ stat.perimeter_m | round(2) }}</td>
+          <td>{{ stat.compactness | round(4) }}</td>
+          {% for idx in index_names %}
+          <td>{{ stat.mean_values[idx] | round(4) }}</td>
+          <td>{{ stat.std_values[idx] | round(4) }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h3>Figures</h3>
+    <div class="figure">
+      <h4>NDVI Map</h4>
+      {% if figures.mapa_ndvi %}
+      <img src="{{ figures.mapa_ndvi }}" alt="NDVI Map" width="600" />
+      {% else %}
+      <p><em>No NDVI provided.</em></p>
+      {% endif %}
+    </div>
+    <div class="figure">
+      <h4>Cluster Map</h4>
+      <img src="{{ figures.mapa_clusters }}" alt="Cluster Map" width="600" />
+    </div>
+    <div class="figure">
+      <h4>Overview Chart</h4>
+      <img src="{{ figures.zonificacion_results }}" alt="Overview Chart" width="600" />
+    </div>
+  </body>
+</html>
+```
+
+#### 3.1.2 generate_report.py
+
+```python
+#!/usr/bin/env python3
+import json
+import sys
+from pathlib import Path
+
+import pandas as pd
+from jinja2 import Environment, FileSystemLoader
+from weasyprint import HTML
+
+def load_manifest(manifest_path: Path) -> dict:
+    with open(manifest_path, "r") as f:
+        return json.load(f)
+
+def generate_pdf_report(manifest: dict, template_dir: Path, output_pdf: Path):
+    # Extract field name from manifest (assume input raster path ends in <field>.tif)
+    input_raster = Path(manifest["interfaces"]["input"]["raster"])
+    field_name = input_raster.stem
+
+    # Load metrics JSON
+    metrics_path = Path(manifest["interfaces"]["output"]["json"])
+    with open(metrics_path, "r") as f:
+        metrics = json.load(f)
+
+    # Load CSV into DataFrame
+    stats_path = Path(manifest["interfaces"]["output"]["csv"])
+    df_stats = pd.read_csv(stats_path)
+
+    # Build ZoneStats list of dicts
+    stats_list = []
+    index_columns = [col for col in df_stats.columns if col not in ("zone_id", "area_ha", "perimeter_m", "compactness")]
+    index_names = sorted({col.rsplit("_", 1)[0] for col in index_columns})
+
+    for _, row in df_stats.iterrows():
+        mean_vals = {idx: row[f"{idx}_mean"] for idx in index_names}
+        std_vals = {idx: row[f"{idx}_std"] for idx in index_names}
+        stats_list.append({
+            "zone_id": int(row["zone_id"]),
+            "area_ha": float(row["area_ha"]),
+            "perimeter_m": float(row["perimeter_m"]),
+            "compactness": float(row["compactness"]),
+            "mean_values": mean_vals,
+            "std_values": std_vals,
+        })
+
+    # Collect figure paths
+    figures = {
+        "mapa_ndvi": manifest["interfaces"]["output"]["png"].get("mapa_ndvi"),
+        "mapa_clusters": manifest["interfaces"]["output"]["png"]["mapa_clusters"],
+        "zonificacion_results": manifest["interfaces"]["output"]["png"]["zonificacion_results"],
+    }
+
+    # Jinja2 template rendering
+    env = Environment(loader=FileSystemLoader(str(template_dir)))
+    template = env.get_template("zoning_report.html.j2")
+
+    html_content = template.render(
+        field_name=field_name,
+        timestamp=manifest["timestamp"],
+        metrics=metrics,
+        stats_list=stats_list,
+        index_names=index_names,
+        figures=figures,
+    )
+
+    # Generate PDF
+    HTML(string=html_content, base_url=str(template_dir)).write_pdf(str(output_pdf))
+    print(f"[REPORT] Generated PDF: {output_pdf}")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print("Usage: generate_report.py <manifest.json> <templates_dir> <output.pdf>")
+        sys.exit(1)
+
+    manifest_path = Path(sys.argv[1])
+    template_dir = Path(sys.argv[2])
+    output_pdf = Path(sys.argv[3])
+    manifest = load_manifest(manifest_path)
+    generate_pdf_report(manifest, template_dir, output_pdf)
+```
+
+After running Pascal Zoning ML on field_A.tif, you have:
+
+```
+outputs/field_A/20250604_170000_k4_mz0.25/
+├── zonificacion_agricola.gpkg
+├── puntos_muestreo.gpkg
+├── mapa_ndvi.png
+├── mapa_clusters.png
+├── estadisticas_zonas.csv
+├── metricas_clustering.json
+├── zonificacion_results.png
+└── manifest_zoning.json
+```
+
+Run:
+
+```powershell
+python scripts/generate_report.py `
+  outputs/field_A/20250604_170000_k4_mz0.25/manifest_zoning.json `
+  templates/ `
+  outputs/field_A/20250604_170000_k4_mz0.25/field_A_report.pdf
+```
+
+This integration ensures ISO 42001 compliance by capturing:
+- Exact file paths
+- Timestamps of processing
+- Version of Pascal Zoning ML used (from the manifest)
+- Per‐zone metrics
+
+## 4. ISO 42001–Level Traceability Hooks
+
+To comply with ISO 42001, you must demonstrate:
+- Traceability of each run (who, when, how)
+- Version control of code & dependencies
+- Audit‐ready logs & manifests
+
+### 4.1 Extended Manifest Schema
+
+Use `schemas/zoning_output.schema.json` to validate your output manifest:
+
+```jsonc
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PASCAL Zoning ML Output Manifest",
+  "type": "object",
+  "required": ["version", "timestamp", "input_image", "outputs", "metadata"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9]+)?$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "input_image": {
+      "type": "object",
+      "required": ["path", "bands", "crs", "transform"]
+      // ...
+    },
+    "outputs": {
+      "type": "object",
+      "required": ["geopackages", "csv", "json", "png"]
+      // ...
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["processing_time", "software_version"]
+      // ...
+    }
+  }
+}
+```
+
+You can validate it manually:
+
+```powershell
+check-jsonschema `
+  --schemafile schemas/zoning_output.schema.json `
+  outputs/field_A/20250604_170000_k4_mz0.25/manifest_zoning.json
+```
+
+### 4.2 Logging & Audit Trail
+
+Configure Loguru to write logs to both console and a timestamped log file:
+
+```python
+from loguru import logger
+import os
+
+# In main CLI entrypoint:
+timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+log_dir = Path(output_dir) / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+log_path = log_dir / f"run_{timestamp}.log"
+
+logger.remove()  # Remove default handler
+logger.add(sys.stderr, level=os.getenv("ZONING_LOG_LEVEL", "INFO"))
+logger.add(str(log_path), level="DEBUG", rotation="10 MB", retention="7 days")
+
+logger.info(f"Starting Pascal Zoning ML v{__version__} at {timestamp}")
+```
+
+The final output folder contains:
+```
+logs/run_20250604T170000Z.log
+manifest_zoning.json
+zonificacion_agricola.gpkg
+puntos_muestreo.gpkg
+...
+```
+
+### 4.3 Git Commit & Dependency Freeze
+
+Before running a production‐grade batch:
+
+Record the Git commit SHA:
+```powershell
+$GIT_SHA = git rev-parse HEAD
+$JSON = "{`"git_sha`": `"$GIT_SHA`"}"
+Add-Content `
+  outputs/field_A/20250604_170000_k4_mz0.25/manifest_zoning.json `
+  -Value $JSON
+```
+
+Freeze Python dependencies:
+```powershell
+pip freeze > outputs/field_A/20250604_170000_k4_mz0.25/requirements_frozen.txt
+```
+
+Include these two files alongside your manifest to satisfy ISO 42001's requirement for "Documented dependency versions" and "Exact code version used."
+
+## 5. Continuous Integration (CI)
+
+To maintain ISO 42001 compliance, ensure that every code push triggers:
+- Linting (flake8, black)
+- Type checks (mypy, pyright)
+- Unit tests (pytest tests/unit)
+- Integration tests (pytest tests/integration)
+
+### 5.1 GitHub Actions Workflow Example
+
+```yaml
+# .github/workflows/ci.yaml
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install dev requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Black Check
+        run: black --check src/
+      - name: Flake8
+        run: flake8 src/
+
+  typecheck:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install core requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install mypy pyright
+      - name: MyPy
+        run: mypy src/
+      - name: Pyright
+        run: pyright
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      - name: Run Unit Tests
+        run: pytest tests/unit --maxfail=1 --disable-warnings -q
+      - name: Run Integration Tests
+        run: pytest tests/integration --maxfail=1 --disable-warnings -q
+```
+
+This ensures that every push/PR is validated, fulfilling ISO 42001's "Continuous Quality Control" requirement.
+
+## 6. Summary
+
+- **Batch Processing**: Leverage ProcessPoolExecutor + shared config for multiple fields.
+- **Custom Metrics**: Extend ClusterMetrics for additional validation metrics.
+- **Downstream Reports**: Use Jinja2 + WeasyPrint for audit‐ready, branded reports.
+- **ISO 42001 Traceability**: Generate & validate JSON manifests, capture Git SHA, freeze dependencies.
+- **CI/CD Practices**: Lint, type‐check, unit/integration test on every commit.
+
+By following these advanced patterns, you can embed Pascal Zoning ML into enterprise‐grade precision‐agriculture systems, maintain regulatory compliance, and deliver reproducible zonification results at scale.

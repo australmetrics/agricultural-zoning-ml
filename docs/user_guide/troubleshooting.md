@@ -1,427 +1,211 @@
 # Troubleshooting Guide
 
-© 2025 AustralMetrics SpA. All rights reserved.
+If you encounter issues when installing or running PASCAL Agri-Zoning, this guide offers common error messages, likely causes, and suggested solutions.
 
-This guide provides solutions to common issues encountered when using the PASCAL NDVI Block module, following ISO 42001 traceability and documentation standards.
+---
 
-## Before You Start
+## 1. Import / Installation Errors
 
-### Check System Requirements
-- Python 3.7 or higher
-- Required dependencies installed (`pip install -r requirements.txt`)
-- Sufficient disk space for input/output files
-- Valid input imagery (Sentinel-2 or Landsat format)
+### 1.1. `ModuleNotFoundError: No module named 'rasterio'`
+- **Cause:** The `rasterio` dependency is not installed or its GDAL backend is missing.  
+- **Solution:**  
+  1. Ensure GDAL is installed on your system.  
+     - Ubuntu: `sudo apt-get install gdal-bin libgdal-dev`  
+     - macOS: `brew install gdal`  
+  2. Reinstall `rasterio` in your environment:  
+     ```bash
+     pip install rasterio
+     ```
+  3. Verify `import rasterio` in a Python REPL:  
+     ```python
+     >>> import rasterio
+     >>> print(rasterio.__version__)
+     ```
 
-### Enable Debug Logging
-For detailed troubleshooting information, set debug logging in your `.env` file:
-```
-LOG_LEVEL=DEBUG
-```
+---
 
-All debugging information will be saved to `results/logs/pascal_ndvi_YYYYMMDD_HHMMSS.log`.
+### 1.2. `ModuleNotFoundError: No module named 'geopandas'` or `ImportError: GDAL version x.x.x is required`
+- **Cause:** `geopandas` (and its dependencies) are missing or have mismatched GDAL versions.  
+- **Solution:**  
+  1. Install system GDAL (matching version) first.  
+  2. Reinstall `geopandas`:  
+     ```bash
+     pip install geopandas
+     ```
+  3. If using `conda`, it can manage dependencies automatically:  
+     ```bash
+     conda install -c conda-forge geopandas
+     ```
 
-## Installation Issues
+---
 
-### Problem: ImportError or ModuleNotFoundError
-**Symptoms:**
-```
-ImportError: No module named 'rasterio'
-ModuleNotFoundError: No module named 'geopandas'
-```
+## 2. Runtime Errors in Zoning Pipeline
 
-**Solutions:**
-1. **Verify virtual environment activation:**
-   ```bash
-   # Linux/Mac
-   source venv/bin/activate
-   
-   # Windows
-   venv\Scripts\activate
-   ```
+### 2.1. `ZonificationError: Bounds not initialized` or similar
+- **Cause:** The pipeline expects a valid polygon bounding geometry (`bounds`) to be set before creating a mask.  
+- **Solution:**  
+  - Ensure your input TIFF is not entirely zeros (no-data).  
+  - The code extracts the field polygon by reading the first band (`banda1 > 0`). If your TIFF's "inside‐field" pixels are exactly zero, adjust the threshold or mask generation logic.  
+  - Confirm the TIFF has valid pixel values where the field exists (values > 0). You can inspect with:  
+    ```bash
+    gdalinfo -stats inputs/my_field_multiband.tif
+    ```
 
-2. **Reinstall dependencies:**
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
+---
 
-3. **For GDAL/rasterio issues on Windows:**
-   ```bash
-   pip install --upgrade pip setuptools wheel
-   pip install GDAL
-   pip install rasterio
-   ```
+### 2.2. `ProcessingError: No valid pixels found inside polygon`
+- **Cause:**  
+  1. The field polygon might be empty or poorly extracted.  
+  2. All spectral index arrays are NaN under the field area (e.g., the TIFF contains no valid data for the requested bands).  
+- **Solution:**  
+  - Check that `indices` (NDVI, NDWI, etc.) contain valid (non-NaN) values.  
+    ```python
+    # Quick check in Python
+    from pascal_zoning.interface import NDVIBlockInterface
+    import numpy as np
 
-### Problem: Permission Denied Errors
-**Symptoms:**
-```
-PermissionError: [Errno 13] Permission denied
-```
+    block = NDVIBlockInterface(data_path="inputs")
+    indices = block.load_spectral_indices(Path("inputs"), ["ndvi", "ndwi"])
+    for name, arr in indices.items():
+        print(name, np.count_nonzero(~np.isnan(arr)), "valid pixels")
+    ```
+  - If fewer than `min_valid_pixels_ratio * total_pixels`, the pipeline will warn or raise an error (depending on your config).  
+  - Confirm that `bounds` geometry overlaps the raster: use tools like `gdal_polygonize.py` or QGIS to visualize.
 
-**Solutions:**
-1. **Run with appropriate permissions:**
-   - Windows: Run Command Prompt as Administrator
-   - Linux/Mac: Use `sudo` if necessary, or change file permissions
+---
 
-2. **Check output directory permissions:**
-   ```bash
-   # Create results directory with proper permissions
-   mkdir -p results/logs
-   chmod 755 results
-   ```
+### 2.3. `ValueError: Shapes of spectral indices are inconsistent`
+- **Cause:** The four requested index arrays (NDVI, NDWI, etc.) do not share the exact same dimensions.  
+- **Solution:**  
+  - Verify that your GeoTIFF bands all have identical width/height.  
+  - If you generated each band separately, ensure they were resampled or clipped in a consistent manner.  
+  - In Python:  
+    ```python
+    for name, arr in indices.items():
+        print(name, arr.shape)
+    ```
+  - All shapes must match (e.g., `(1024, 1024)`).
 
-## Input Data Issues
+---
 
-### Problem: Image File Not Found
-**Symptoms:**
-```
-FileNotFoundError: Image file not found: data/my_image.tif
-```
+### 2.4. `ValueError: Invalid indices: ['something']` (from `_load_indices`)
+- **Cause:** You passed an unsupported index name to `--indices` or `index_names` (case‐sensitive).  
+- **Solution:** Use only valid indices: `ndvi`, `ndwi`, `ndre`, or `si`. Example:  
+  ```bash
+  pascal-zoning run --indices ndvi,ndwi
+  ```
 
-**Solutions:**
-1. **Verify file path:**
-   ```bash
-   ls -la data/  # Linux/Mac
-   dir data\     # Windows
-   ```
+---
 
-2. **Use absolute paths:**
-   ```bash
-   python -m src.main indices --image=/full/path/to/image.tif
-   ```
+## 3. Clustering and Zone Generation
 
-3. **Check file permissions:**
-   ```bash
-   chmod 644 data/my_image.tif  # Linux/Mac
-   ```
+### 3.1. `ProcessingError: cluster_labels not initialized` or `dimensions not initialized`
+- **Cause:** The code attempted to perform clustering before preparing the feature matrix or setting up dimensions (height, width).
+- **Solution:**
+  - Confirm that you invoked `run_pipeline()` or `ZoningPipeline.run()` in the correct order.
+  - Internally, `run_pipeline()` does:
+    1. `create_mask()`
+    2. `prepare_feature_matrix()`
+    3. `perform_clustering()`
+    4. `extract_zone_polygons()`
+    5. `filter_small_zones()`
+    6. `compute_zone_statistics()`
+    7. `generate_sampling_points()`
+  - Do not call `perform_clustering()` manually before `prepare_feature_matrix()`. Always use the high‐level `run_pipeline()` or `ZoningPipeline.run()`.
 
-### Problem: Unsupported Image Format
-**Symptoms:**
-```
-Error: Unable to read image bands
-rasterio.errors.RasterioIOError
-```
+---
 
-**Solutions:**
-1. **Supported formats:**
-   - GeoTIFF (.tif, .tiff)
-   - Sentinel-2 JP2 files (.jp2)
-   - Landsat GeoTIFF files
+### 3.2. `ProcessingError: No zone polygons generated (no labeled pixels)`
+- **Cause:**
+  - After clustering, all pixels were assigned -1 (unassigned), so no zone polygons can be formed.
+  - Possible if `valid_mask` is empty, or K selection produced too many clusters and filtered them all out.
+- **Solution:**
+  - Check that `valid_mask` contains True values.
+  - If you forced a very large `force_k` (e.g., more clusters than valid pixels), reduce it.
+  - Try a smaller `max_zones` or do not force K at all.
 
-2. **Convert unsupported formats:**
-   ```bash
-   # Using GDAL
-   gdal_translate input.jpg output.tif
-   ```
+---
 
-3. **Verify image integrity:**
-   ```bash
-   gdalinfo data/my_image.tif
-   ```
+### 3.3. `ProcessingError: No sampling points generated`
+- **Cause:** The inhibition sampling routine could not find any pixels in a zone (e.g., zone is too small or all pixels were filtered).
+- **Solution:**
+  - Ensure `points_per_zone` (default: 5) is not greater than the number of valid pixels in each zone.
+  - You can reduce `min_points_per_zone` in your `ZoningConfig` or pass a smaller `points_per_zone` to the `run()` method.
+  - Inspect the zone geometries in a GIS tool to confirm they cover at least `points_per_zone` pixels.
 
-### Problem: Missing Spectral Bands
-**Symptoms:**
-```
-Error: Required bands not found in image
-KeyError: 'Band X not available'
-```
+---
 
-**Solutions:**
-1. **For Sentinel-2 imagery:**
-   - Required bands: B4 (Red), B8 (NIR), B5 (Red Edge), B8A (NIR Narrow)
-   - Ensure all bands are present in the image file
+## 4. Configuration & Logging Issues
 
-2. **For Landsat imagery:**
-   - Required bands: Band 4 (Red), Band 5 (NIR)
-   - Check band naming convention
+### 4.1. `ValueError: max_clusters must be >= 2`
+- **Cause:** In your configuration JSON or code, `model.max_clusters` is set to less than 2.
+- **Solution:**
+  - Edit your config (`my_config.json`) to use `max_clusters: 2` or greater.
+  - Example snippet:
+    ```json
+    "model": {
+      "clustering_method": "kmeans",
+      "max_clusters": 5,
+      "random_state": 42
+    }
+    ```
 
-3. **Verify band structure:**
-   ```bash
-   gdalinfo -checksum data/my_image.tif
-   ```
+---
 
-## Processing Errors
+### 4.2. Logging not appearing in `logs/`
+- **Cause:** Either `setup_logging()` was not called, or you pointed `output_dir` to a non‐writable location.
+- **Solution:**
+  - Confirm that the pipeline was run with a valid `output_dir` (e.g., a directory you have write permission for).
+  - Inside your Python code, before `run_pipeline()` or `ZoningPipeline.run()`, ensure `output_dir` is passed correctly.
+  - After execution, you should see a `logs/` subfolder with a file `agri_zoning_<timestamp>.log`. If not, check file permissions.
 
-### Problem: Memory Errors
-**Symptoms:**
-```
-MemoryError: Unable to allocate array
-numpy.core._exceptions.MemoryError
-```
+---
 
-**Solutions:**
-1. **Reduce image size:**
-   - Use clipping functionality to process smaller areas
-   - Resample image to lower resolution
+## 5. Visualization Issues
 
-2. **Increase system memory:**
-   - Close unnecessary applications
-   - Use a machine with more RAM
+### 5.1. Blank or partially blank `mapa_ndvi.png` / `mapa_clusters.png`
+- **Cause:**
+  - If the NDVI index was not requested or computed, `visualize_results()` skips generating the NDVI map (and issues a warning).
+  - If `zones_gdf` or `samples_gdf` is empty, the cluster map may be blank.
+- **Solution:**
+  - Confirm you requested `ndvi` in the `--indices` list.
+  - Check logs: if you see `Warning: No NDVI found`, include "ndvi" in your indices.
+  - Make sure `run_pipeline()` completed successfully and produced non-empty zones and samples.
 
-3. **Process in tiles:**
-   ```bash
-   # Process smaller sections of large images
-   python -m src.main clip --image=large_image.tif --shapefile=small_area.shp
-   ```
+---
 
-### Problem: Invalid Pixel Values
-**Symptoms:**
-```
-RuntimeWarning: invalid value encountered in divide
-All NDVI values are NaN
-```
+## 6. Unexpected Exceptions
 
-**Solutions:**
-1. **Check for valid pixel ranges:**
-   - Ensure pixel values are within expected ranges (0-10000 for Sentinel-2)
-   - Verify no-data values are properly masked
+If you encounter any other exceptions, consider the following steps:
 
-2. **Inspect input data:**
-   ```python
-   import rasterio
-   with rasterio.open('data/my_image.tif') as src:
-       data = src.read(1)
-       print(f"Min: {data.min()}, Max: {data.max()}")
-   ```
+### Enable Debug Logging:
+In your `ZoningConfig`, set `"log_level": "DEBUG"` and rerun. Examine the detailed log in `logs/`.
 
-3. **Apply proper scaling:**
-   - Sentinel-2: Values typically range 0-10000
-   - Landsat: Values typically range 0-65535
+### Inspect Input Data:
+- Confirm your TIFF's band order and data type (must be float32 or convertible).
+- Use a GIS tool to verify the raster's bounds and pixel values.
 
-## Output Issues
+### Run a Minimal Test:
+```python
+from pascal_zoning.interface import NDVIBlockInterface
+from pascal_zoning.pipeline import ZoningPipeline
 
-### Problem: Empty Results Directory
-**Symptoms:**
-- No output files generated
-- Missing NDVI/NDRE/SAVI results
+# 1) Check spectral indices
+block = NDVIBlockInterface(data_path="inputs")
+indices = block.load_spectral_indices(Path("inputs"), ["ndvi"])
+print("NDVI stats:", float(indices["ndvi"].min()), float(indices["ndvi"].max()))
 
-**Solutions:**
-1. **Check log files:**
-   ```bash
-   # View latest log
-   ls -lt results/logs/
-   cat results/logs/pascal_ndvi_*.log
-   ```
-
-2. **Verify write permissions:**
-   ```bash
-   ls -la results/
-   mkdir -p results/indices
-   ```
-
-3. **Run with verbose output:**
-   ```bash
-   python -m src.main indices --image=data/my_image.tif --verbose
-   ```
-
-### Problem: Corrupted Output Files
-**Symptoms:**
-- Cannot open result files
-- Garbled or incomplete data
-
-**Solutions:**
-1. **Verify output integrity:**
-   ```bash
-   gdalinfo results/indices/ndvi_result.tif
-   ```
-
-2. **Check disk space:**
-   ```bash
-   df -h  # Linux/Mac
-   dir   # Windows
-   ```
-
-3. **Re-run processing:**
-   ```bash
-   # Clear previous results and re-run
-   rm -rf results/indices/*
-   python -m src.main indices --image=data/my_image.tif
-   ```
-
-## CLI Command Issues
-
-### Problem: Command Not Recognized
-**Symptoms:**
-```
-python: No module named src.main
-Command 'pascal-ndvi' not found
+# 2) Run pipeline with only NDVI
+pipeline = ZoningPipeline()
+pipeline.run(raster_path=Path("inputs/my_field_multiband.tif"),
+             index_names=["ndvi"],
+             output_dir=Path("outputs_test"))
 ```
 
-**Solutions:**
-1. **Use proper module syntax:**
-   ```bash
-   python -m src.main [command] [options]
-   ```
+### Raise an Issue / Contact Support:
+If none of the above resolves your problem, please open a GitHub issue in the pascal-zoning repository with:
+- A description of the error's full stack trace.
+- A small sample dataset (if possible) to reproduce the issue.
+- Your environment (OS, Python version, GDAL version, library versions).
 
-2. **Verify current directory:**
-   ```bash
-   pwd  # Should be in pascal-ndvi-block/
-   ls   # Should see src/ directory
-   ```
-
-3. **Check Python path:**
-   ```bash
-   python -c "import sys; print(sys.path)"
-   ```
-
-### Problem: Invalid Command Arguments
-**Symptoms:**
-```
-Error: Invalid value for '--image'
-Usage: python -m src.main [OPTIONS] COMMAND [ARGS]
-```
-
-**Solutions:**
-1. **Check command syntax:**
-   ```bash
-   python -m src.main --help
-   python -m src.main indices --help
-   ```
-
-2. **Use proper flag format:**
-   ```bash
-   # Correct
-   python -m src.main indices --image=data/file.tif
-   
-   # Also correct
-   python -m src.main indices --image data/file.tif
-   ```
-
-## Performance Issues
-
-### Problem: Slow Processing
-**Symptoms:**
-- Long processing times
-- System becoming unresponsive
-
-**Solutions:**
-1. **Monitor system resources:**
-   ```bash
-   # Linux/Mac
-   top
-   htop
-   
-   # Windows
-   Task Manager
-   ```
-
-2. **Optimize processing:**
-   - Use smaller input images
-   - Process during off-peak hours
-   - Close unnecessary applications
-
-3. **Enable progress monitoring:**
-   ```bash
-   # Check log files for progress
-   tail -f results/logs/pascal_ndvi_*.log
-   ```
-
-## Logging and Audit Issues
-
-### Problem: Missing Log Files
-**Symptoms:**
-- No logs in `results/logs/`
-- Cannot track processing history
-
-**Solutions:**
-1. **Verify log directory permissions:**
-   ```bash
-   mkdir -p results/logs
-   chmod 755 results/logs
-   ```
-
-2. **Check environment configuration:**
-   ```bash
-   # Verify .env file exists and contains:
-   cat .env
-   # USERNAME=your_username
-   # LOG_LEVEL=INFO
-   ```
-
-3. **Force log creation:**
-   ```bash
-   touch results/logs/test.log
-   ls -la results/logs/
-   ```
-
-### Problem: Log Files Too Large
-**Symptoms:**
-- Disk space issues
-- Slow log file access
-
-**Solutions:**
-1. **Enable log rotation:**
-   - Logs are automatically backed up in `results/logs/backup/`
-   - Old logs are compressed and archived
-
-2. **Clean old logs:**
-   ```bash
-   # Remove logs older than 30 days
-   find results/logs/ -name "*.log" -mtime +30 -delete
-   ```
-
-3. **Adjust log level:**
-   ```bash
-   # In .env file, set:
-   LOG_LEVEL=WARNING  # Reduces log verbosity
-   ```
-
-## ISO 42001 Compliance Issues
-
-### Problem: Audit Trail Incomplete
-**Symptoms:**
-- Missing processing timestamps
-- Insufficient traceability information
-
-**Solutions:**
-1. **Verify logging configuration:**
-   - Ensure `USERNAME` is set in `.env` file
-   - Check log level is appropriate (INFO or DEBUG)
-
-2. **Validate log integrity:**
-   ```bash
-   # Check SHA-256 hashes
-   ls results/logs/*.sha256
-   sha256sum -c results/logs/pascal_ndvi_*.sha256
-   ```
-
-3. **Ensure complete audit trail:**
-   - All commands generate logs
-   - User information is recorded
-   - Processing parameters are saved
-
-## Getting Additional Help
-
-### Collecting Diagnostic Information
-When reporting issues, please provide:
-
-1. **System Information:**
-   ```bash
-   python --version
-   pip list | grep -E "(rasterio|geopandas|numpy|typer|loguru)"
-   ```
-
-2. **Error Logs:**
-   ```bash
-   # Latest log file
-   cat results/logs/pascal_ndvi_*.log | tail -100
-   ```
-
-3. **Input Data Information:**
-   ```bash
-   gdalinfo data/your_image.tif
-   ```
-
-### Contact Information
-- **Internal Issues**: Create GitHub issue in the internal repository
-- **Urgent Support**: Contact AustralMetrics SpA development team
-- **Documentation**: Refer to `docs/` folder for additional guides
-
-### ISO 42001 Compliance
-All troubleshooting activities are logged for compliance purposes. Ensure proper documentation of:
-- Issue description and timestamps
-- Steps taken to resolve
-- Final resolution and verification
-- User information and system state
-
-This ensures full traceability and audit compliance as required by ISO 42001 standards.
+**Reminder:** Always check that your input data (TIFF, polygon extraction) is valid and that any custom configuration JSON matches the schema defined in `pascal_zoning/config.py`.

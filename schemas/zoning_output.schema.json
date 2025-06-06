@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PASCAL Zoning ML Output Manifest",
+  "description": "Schema to validate the output manifest JSON produced by Pascal Zoning ML.",
+  "type": "object",
+  "required": ["version", "timestamp", "input_image", "outputs", "metadata"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9]+)?$",
+      "description": "Version of Pascal Zoning ML"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when outputs were generated"
+    },
+    "input_image": {
+      "type": "object",
+      "required": ["path", "bands", "crs", "transform"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the original input GeoTIFF"
+        },
+        "bands": {
+          "type": "object",
+          "description": "Mapping of spectral band names to band indices (1-based)",
+          "patternProperties": {
+            "^[A-Za-z0-9_]+$": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "crs": {
+          "type": "string",
+          "description": "Coordinate reference system (e.g., EPSG:32719)"
+        },
+        "transform": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 6,
+          "maxItems": 6,
+          "description": "Affine transform parameters [a, b, c, d, e, f]"
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "required": ["geopackages", "csv", "json", "png"],
+      "properties": {
+        "geopackages": {
+          "type": "object",
+          "required": ["zonificacion_agricola", "puntos_muestreo"],
+          "properties": {
+            "zonificacion_agricola": {
+              "type": "string",
+              "pattern": "^.*\\\\.gpkg$",
+              "description": "GeoPackage with management zone polygons"
+            },
+            "puntos_muestreo": {
+              "type": "string",
+              "pattern": "^.*\\\\.gpkg$",
+              "description": "GeoPackage with sampling point geometry and index values"
+            }
+          }
+        },
+        "csv": {
+          "type": "string",
+          "pattern": "^.*\\\\.csv$",
+          "description": "CSV containing per-zone statistics"
+        },
+        "json": {
+          "type": "string",
+          "pattern": "^.*\\\\.json$",
+          "description": "JSON containing cluster metrics"
+        },
+        "png": {
+          "type": "object",
+          "required": ["mapa_clusters", "zonificacion_results"],
+          "properties": {
+            "mapa_ndvi": {
+              "type": ["string", "null"],
+              "pattern": "^.*\\\\.png$",
+              "description": "PNG of NDVI raster (if NDVI was provided)"
+            },
+            "mapa_clusters": {
+              "type": "string",
+              "pattern": "^.*\\\\.png$",
+              "description": "PNG of cluster polygons"
+            },
+            "zonificacion_results": {
+              "type": "string",
+              "pattern": "^.*\\\\.png$",
+              "description": "Overview composite PNG (cluster map + bar chart)"
+            }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["processing_time", "software_version"],
+      "properties": {
+        "processing_time": {
+          "type": "number",
+          "description": "Total processing time in seconds"
+        },
+        "software_version": {
+          "type": "string",
+          "description": "Version of Pascal Zoning ML software used"
+        }
+      }
+    }
+  }
+}
+

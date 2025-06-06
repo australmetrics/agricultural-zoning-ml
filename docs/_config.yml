@@ -10,22 +10,23 @@ kramdown:
   input: GFM
   hard_wrap: false
 
-title: PASCAL NDVI Block Documentation
-description: High-performance vegetation index calculation with ISO 42001 compliance
+title: Agricultural Zoning ML Documentation
+description: Precision agriculture zoning and vegetation index analysis system
 
 # Navigation
 header_pages:
   - index.md
-  - README.md
+  - user_guide/quick_start.md
+  - user_guide/user_guide.md
+  - technical/api_documentation.md
+  - technical/architecture_overview.md
   - examples/basic_usage.md
   - examples/advanced_examples.md
-  - user_guide/user_guide.md
-  - technical/technical_documentation.md
 
 # GitHub Pages settings
 github:
   is_project_page: true
-  repository_url: https://github.com/australmetrics/pascal-ndvi-block
+  repository_url: https://github.com/australmetrics/agri-zoning-ml
 
 # Additional settings
 show_downloads: true

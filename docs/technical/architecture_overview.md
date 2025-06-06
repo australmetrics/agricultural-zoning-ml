@@ -1,22 +1,217 @@
-# Architecture Overview
+# Visión General de la Arquitectura
 
-© 2025 AustralMetrics SpA. All rights reserved.
+Este documento proporciona una visión general de alto nivel de la arquitectura del sistema Pascal Zoning ML.
 
-## System Architecture
+## 1. Estruresult = zoning.run_pipeline(
+    indices=indices_dict,
+    bounds=field_polygon,
+    points_per_zone=5,
+    crs="EPSG:32719"
+)
 
-The PASCAL NDVI Block follows a modular, layered architecture designed for maintainability, testability, and ISO 42001 compliance. The system is built around three core principles: simplicity, reliability, and auditability.
+## 6. Dependencias Principales
 
-## High-Level Architecture Diagram
+- **Científicas**:
+  - numpy: operaciones con arrays
+  - scikit-learn: clustering y métricas
+  - pandas: manipulación de datos tabulares
+
+- **Geoespaciales**:
+  - geopandas: operaciones vectoriales
+  - rasterio: operaciones raster
+  - shapely: geometrías
+
+- **Visualización**:
+  - matplotlib: generación de figuras
+
+- **Utilidades**:
+  - typer: CLI
+  - loguru: logging
+  - pyyaml: configuración
+
+## 7. Consideraciones ISO 42001
+
+El sistema implementa:
+
+- Trazabilidad completa de operaciones
+- Validación de entradas y salidas
+- Reproducibilidad de resultados
+- Control de versiones de dependencias
+- Documentación exhaustiva
+- Tests automatizados
+
+## 8. Extensibilidad
+
+El sistema puede extenderse mediante:
+
+1. Subclasificación de `AgriculturalZoning`
+2. Implementación de nuevas métricas de clustering
+3. Personalización de estrategias de muestreo
+4. Adición de nuevos formatos de exportación
+5. Integración con otros sistemas del Proyecto
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        User Interface Layer                 │
-├─────────────────────────────────────────────────────────────┤
-│  CLI Interface (Typer)     │     Direct API Access          │
-└─────────────────────────────────────────────────────────────┘
-                                    │
-┌─────────────────────────────────────────────────────────────┐
-│                    Orchestration Layer                     │
+agricultural-zoning-ml/
+├── src/
+│   └── pascal_zoning/
+│       ├── __init__.py
+│       ├── zoning.py          # Motor principal de zonificación  
+│       ├── pipeline.py        # CLI basado en Typer
+│       ├── config.py          # Cargador de configuración
+│       ├── logging_config.py  # Configuración de Loguru
+│       ├── interface.py       # Definiciones de tipos
+│       └── viz.py            # Funciones de visualización
+## 2. Componentes Principales
+
+### 2.1 Motor de Zonificación (`zoning.py`)
+
+El núcleo del sistema implementado en la clase `AgriculturalZoning`. Responsable de:
+
+1. Creación de máscaras a partir de índices espectrales
+2. Preparación de matrices de características 
+3. Clustering con K-Means
+4. Extracción de polígonos de zonas 
+5. Generación de puntos de muestreo
+6. Cálculo de estadísticas por zona
+7. Exportación de resultados
+8. Visualización de resultados
+
+### 2.2 Interfaz de Línea de Comandos (`pipeline.py`)
+
+Implementa el CLI usando Typer, permitiendo:
+
+- Ejecución del pipeline completo
+- Configuración de parámetros via argumentos
+- Integración con flujos de trabajo automatizados
+- Logging estructurado
+
+### 2.3 Gestión de Configuración (`config.py`)
+
+Maneja la configuración del sistema a través de:
+
+- Archivos YAML
+- Variables de entorno
+- Validación de parámetros
+- Valores por defecto
+
+### 2.4 Logging y Trazabilidad (`logging_config.py`)
+
+Configura el sistema de logging usando Loguru para:
+
+- Mensajes formateados con timestamp
+- Niveles de log configurables
+- Salida a consola y archivo
+- Trazabilidad para ISO 42001
+
+### 2.5 Interfaces y Tipos (`interface.py`)
+
+Define las estructuras de datos centrales:
+
+```python
+@dataclass
+class ClusterMetrics:
+    n_clusters: int
+    silhouette: float
+    calinski_harabasz: float
+    inertia: float
+    cluster_sizes: Dict[int, int]
+    timestamp: str
+
+@dataclass
+class ZoneStats:
+    zone_id: int
+    area_ha: float
+    perimeter_m: float
+    compactness: float
+    mean_values: Dict[str, float]
+    std_values: Dict[str, float]
+
+@dataclass
+class ZoningResult:
+    zones: gpd.GeoDataFrame
+    samples: gpd.GeoDataFrame
+    metrics: ClusterMetrics
+    stats: List[ZoneStats]
+```
+
+### 2.6 Visualización (`viz.py`)
+
+Proporciona funciones para generar:
+
+- Mapas de índices espectrales
+- Mapas de clusters
+- Gráficos de barras de áreas
+- Figuras de resumen
+
+## 3. Flujo de Datos
+
+1. **Entrada**:
+   - Índices espectrales (arrays NumPy 2D)
+   - Polígono del campo (Shapely)
+   - Parámetros de configuración
+
+2. **Procesamiento**:
+   - Validación de entradas
+   - Creación de máscara
+   - Preprocesamiento de características
+   - Clustering
+   - Extracción de geometrías
+   - Cálculo de estadísticas
+
+3. **Salida**:
+   - GeoPackage: zonas y puntos de muestreo
+   - CSV: estadísticas por zona
+   - JSON: métricas de clustering
+   - PNG: visualizaciones
+
+## 4. Manejo de Errores
+
+Jerarquía de excepciones:
+
+```python
+class ZonificationError(Exception):
+    """Excepción base para errores de zonificación."""
+    pass
+
+class ValidationError(ZonificationError):
+    """Error de validación de entradas."""
+    pass
+
+class ProcessingError(ZonificationError):
+    """Error durante el procesamiento."""
+    pass
+```
+
+## 5. Integración
+
+### 5.1 Uso vía CLI
+
+```bash
+python -m pascal_zoning.pipeline run \
+  --raster ./inputs/field.tif \
+  --indices NDVI,NDWI,NDRE,SI \
+  --output-dir ./outputs \
+  --force-k 3 \
+  --min-zone-size 0.5
+```
+
+### 5.2 Uso vía API
+
+```python
+from pascal_zoning.zoning import AgriculturalZoning
+
+zoning = AgriculturalZoning(
+    random_state=42,
+    min_zone_size_ha=0.5,
+    max_zones=5
+)
+
+result = zoning.run_pipeline(
+    indices=indices_dict,
+    bounds=field_polygon,
+    points_per_zone=5,
+    crs="EPSG:32719"
+)
 ├─────────────────────────────────────────────────────────────┤
 │  Main Controller (src.main)                                │
 │  • Process coordination                                     │

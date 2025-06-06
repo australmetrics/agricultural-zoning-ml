@@ -1,4 +1,4 @@
-name: Verificación de Calidad ISO 42001
+name: Tests
 
 on:
   push:
@@ -8,15 +8,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  quality-check:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.11']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v4      
+        
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -25,65 +25,29 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Verificar si existe requirements.txt
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            # Instalar dependencias mínimas para testing
-            pip install pytest pytest-cov
-          fi
+          pip install -r requirements.txt
+          pip install pytest pytest-cov flake8 mypy black      
+          
+      - name: Check code formatting
+        run: black --check .
 
-      - name: Create src directory if not exists
-        run: |
-          mkdir -p src
-          touch src/__init__.py
+      - name: Run type checking
+        run: mypy src/
+
+      - name: Run linting
+        run: flake8 src/
 
       - name: Run tests with coverage
-        run: |
-          # Ejecutar tests solo si existen
-          if [ -d "tests" ] && [ "$(ls -A tests/*.py 2>/dev/null)" ]; then
-            pytest -q --cov=src --cov-report=xml --cov-report=term
-          else
-            echo "No tests found, creating dummy coverage"
-            echo '<?xml version="1.0" ?><coverage version="7.0.0"><sources><source>.</source></sources><packages></packages></coverage>' > coverage.xml
-          fi
+        run: pytest -v --cov=src --cov-report=xml --cov-report=term
 
-      # Codecov reactivado
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           file: coverage.xml
-          fail_ci_if_error: false
+          fail_ci_if_error: true
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  compliance-check:
-    needs: quality-check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        
-      - name: ISO 42001 Compliance Check
-        run: |
-          echo "✅ Ejecutando verificación de cumplimiento ISO 42001"
-          # Verificar estructura básica del proyecto
-          if [ -f "README.md" ]; then
-            echo "✅ README.md encontrado"
-          else
-            echo "❌ README.md no encontrado"
-            exit 1
-          fi
-          
-          if [ -d "src" ]; then
-            echo "✅ Directorio src encontrado"
-          else
-            echo "❌ Directorio src no encontrado"
-            exit 1
-          fi
-          
-          echo "✅ Verificación ISO 42001 completada"
 
   notify:
     needs: [quality-check, compliance-check]

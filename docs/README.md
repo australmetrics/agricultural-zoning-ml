@@ -1,9 +1,9 @@
-# PASCAL NDVI Block Documentation
+# Agricultural Zoning ML Documentation
 
 © 2025 AustralMetrics SpA. All rights reserved.
 
 ## Public Documentation
-This directory contains the public documentation for the PASCAL NDVI Block. For detailed information, please refer to:
+This directory contains the public documentation for the Agricultural Zoning ML system. For detailed information, please refer to:
 
 - [User Guide](user_guide/user_guide.md)
 - [Technical Documentation](technical/technical_documentation.md)

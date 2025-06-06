@@ -1,25 +1,27 @@
-# User Guide
+---
+title: "User Guide for PASCAL Agri-Zoning"
+---
 
-## Installation
-Detailed software installation instructions.
+# PASCAL Agri-Zoning User Guide
 
-## Using the Software
-### Data Preparation
-- Input image requirements
-- Supported formats
-- Recommended directory structure
+Welcome to the PASCAL Agri-Zoning user guide. This documentation explains how to install, configure, and use the PASCAL package (`pascal_zoning`) for agricultural zoning via machine learning. It also answers frequently asked questions and offers troubleshooting tips.
 
-### Index Calculation
-- NDVI (Normalized Difference Vegetation Index)
-- NDRE (Normalized Difference Red Edge)
-- SAVI (Soil Adjusted Vegetation Index)
+## Table of Contents
 
-### Results Interpretation
-- Output format
-- Results location
-- Log interpretation
+1. [Installation](installation.md)  
+   Learn how to install PASCAL Agri-Zoning, including dependencies and setup.
 
-## Troubleshooting
-- Common errors
-- Integrity verification
-- Support contact
+2. [Quick Start](quick_start.md)  
+   Get up and running quickly with a minimal example: both CLI and Python API.
+
+3. [FAQ](faq.md)  
+   Answers to common questions about PASCAL’s functionalities, configuration, and usage.
+
+4. [Troubleshooting](troubleshooting.md)  
+   Solutions for common issues you may encounter while using PASCAL.
+
+---
+
+> **Note:**  
+> - The code references in this guide assume you have the `pascal_zoning` package installed and accessible in your Python environment (e.g., via `pip install pascal-zoning` or by installing from source).  
+> - All examples below use Python 3.8+ and rely on geospatial libraries such as **rasterio**, **geopandas**, **shapely**, and **scikit-learn**.  

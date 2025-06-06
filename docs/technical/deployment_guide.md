@@ -1,14 +1,132 @@
 # Deployment Guide
 
-© 2025 AustralMetrics SpA. All rights reserved.
+This guide provides detailed instructions for deploying Pascal Zoning ML in various environments, from development to production.
 
-## Overview
+## Table of Contents
 
-This guide provides comprehensive instructions for deploying the PASCAL NDVI Block across different environments, ensuring ISO 42001 compliance and optimal performance. The deployment process is designed for simplicity while maintaining enterprise-grade reliability.
+1. [System Requirements](#1-system-requirements)
+   - [Hardware Requirements](#11-hardware-requirements)
+   - [Software Requirements](#12-software-requirements)
+   - [Pre-Installation Checklist](#pre-installation-checklist)
 
-## Prerequisites
+2. [Installation Methods](#installation-methods)
+   - [Production Deployment](#method-1-production-deployment-recommended)
+   - [Development Setup](#method-2-development-deployment)
+   - [Container Deployment](#method-3-container-deployment)
 
-### System Requirements
+3. [Environment-Specific Configurations](#environment-specific-configurations)
+   - [Windows Deployment](#windows-deployment)
+   - [Linux Deployment](#linux-deployment)
+   - [macOS Deployment](#macos-deployment)
+
+4. [Performance Optimization](#performance-optimization)
+   - [Memory Optimization](#memory-optimization)
+   - [Storage Optimization](#storage-optimization)
+   - [Network Optimization](#network-optimization)
+
+5. [Security Configuration](#security-configuration)
+   - [File Permissions](#file-permissions)
+   - [Windows Security](#windows-security)
+   - [Firewall Configuration](#firewall-configuration)
+
+6. [Monitoring and Maintenance](#monitoring-and-maintenance)
+   - [Health Check Script](#health-check-script)
+   - [Automated Backup Script](#automated-backup-script)
+   - [Monitoring Cron Jobs](#monitoring-cron-jobs)
+
+7. [Troubleshooting Deployment Issues](#troubleshooting-deployment-issues)
+   - [Common Installation Problems](#common-installation-problems)
+   - [Verification Commands](#verification-commands)
+
+8. [Deployment Checklist](#deployment-checklist)
+   - [Pre-Deployment](#pre-deployment)
+   - [During Deployment](#during-deployment)
+   - [Post-Deployment](#post-deployment)
+   - [Production Readiness](#production-readiness)
+
+9. [Support and Maintenance](#support-and-maintenance)
+   - [Regular Maintenance Tasks](#regular-maintenance-tasks)
+   - [Emergency Procedures](#emergency-procedures)
+   - [Contact Information](#contact-information)
+
+## Quick Start Guide
+
+For a rapid deployment, follow these steps:
+
+```bash
+# 1. Clone repository and cd into it 
+git clone https://github.com/australmetrics/pascal-ndvi-block.git
+cd pascal-ndvi-block
+
+# 2. Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+# or
+venv\Scripts\activate     # Windows
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Configure environment
+cp .env.example .env
+# Edit .env with your settings
+
+# 5. Create required directories
+mkdir -p data results logs
+
+# 6. Test installation
+python -m src.main --version
+python -m src.main indices --image=data/sample.tif # if you have test data
+```
+
+For a production deployment, please follow the complete installation instructions in the following sections.
+
+## 1. System Requirements
+
+### 1.1 Hardware Requirements
+
+- **CPU**: Multi-core processor (4+ cores recommended)
+- **RAM**: Minimum 8GB, 16GB+ recommended for large fields
+- **Storage**: 
+  - 1GB for base installation
+  - Additional space for input/output data
+  - SSD recommended for better performance
+
+### 1.2 Software Requirements
+
+- **Python**: Version 3.11 or higher
+- **Operating Systems**:
+  - Linux (Ubuntu 22.04+, CentOS 8+)
+  - Windows 10/11
+  - macOS 12+
+- **GDAL/OGR**: Version 3.6.2 or higher
+- **Git**: For version control and updates
+
+#### Dependencies
+
+##### Core Dependencies
+```plaintext
+numpy>=1.24.0
+pandas>=2.0.0
+geopandas>=0.14.0
+rasterio>=1.3.8
+scikit-learn>=1.3.0
+matplotlib>=3.7.0
+```
+
+##### Optional Dependencies
+```plaintext
+pytest>=8.0.0  # For running tests
+mypy>=1.7.0   # For type checking
+black>=24.0.0  # For code formatting
+```
+
+##### System Libraries
+- GDAL 3.6.2+
+- PROJ 9.0.0+
+- GEOS 3.11.0+
+
+For detailed version compatibility information, check `requirements.txt`.
 
 #### Minimum Requirements
 - **OS**: Windows 10+, Ubuntu 18.04+, macOS 10.15+
@@ -208,21 +326,97 @@ PARALLEL_PROCESSING=false  # Easier debugging
 
 ### Method 3: Container Deployment
 
-#### Docker Setup (Future Enhancement)
+#### Docker Setup
 
 ```dockerfile
-# Dockerfile example for future implementation
-FROM python:3.9-slim
+# Dockerfile for Pascal Zoning ML
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gdal-bin \
+    libgdal-dev \
+    libproj-dev \
+    libgeos-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Install Python dependencies
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy application code
 COPY src/ ./src/
-COPY data/ ./data/
+COPY schemas/ ./schemas/
 
-CMD ["python", "-m", "src.main"]
+# Create necessary directories
+RUN mkdir -p data results logs
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV LOG_LEVEL=INFO
+
+# Run as non-root user
+RUN useradd -m pascal_user
+USER pascal_user
+
+ENTRYPOINT ["python", "-m", "src.main"]
 ```
+
+#### CI/CD Integration
+
+For continuous integration and deployment, you can use the following workflow examples:
+
+##### GitHub Actions
+```yaml
+name: Pascal Zoning ML CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+    
+    - name: Run tests
+      run: |
+        pytest --cov=src/pascal_zoning tests/
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build and push Docker image
+      run: |
+        docker build -t pascal-zoning-ml .
+        # Add your registry push commands here
 
 ## Environment-Specific Configurations
 
@@ -807,5 +1001,76 @@ For deployment support:
 - **System Administration**: Internal IT Department
 - **Security Concerns**: Information Security Team
 - **Business Continuity**: Operations Manager
+
+## System Integration
+
+### API Integration
+
+The Pascal Zoning ML system can be integrated with other systems through its REST API:
+
+```bash
+# Example API calls
+curl -X POST http://localhost:8080/api/v1/zoning \
+  -H "Content-Type: application/json" \
+  -d '{"input_file": "field.tif", "k_clusters": 3}'
+
+# Batch processing
+curl -X POST http://localhost:8080/api/v1/batch \
+  -H "Content-Type: application/json" \
+  -d @batch_config.json
+```
+
+### Data Pipeline Integration
+
+The system can be integrated into existing data processing pipelines:
+
+```python
+from pascal_zoning import Pipeline, Config
+
+# Create pipeline configuration
+config = Config(
+    input_file="field.tif",
+    output_dir="results",
+    k_clusters=3
+)
+
+# Initialize and run pipeline
+pipeline = Pipeline(config)
+results = pipeline.run()
+```
+
+### Cloud Platform Integration
+
+The system supports deployment on major cloud platforms:
+
+#### AWS
+- Use ECS/EKS for container orchestration
+- Store data in S3 buckets
+- Use CloudWatch for monitoring
+
+#### Azure
+- Deploy on AKS
+- Use Azure Blob Storage
+- Monitor with Azure Monitor
+
+#### Google Cloud
+- Run on GKE
+- Store in Cloud Storage
+- Monitor with Cloud Monitoring
+
+### Monitoring Integration
+
+The system can integrate with various monitoring solutions:
+
+```yaml
+# Prometheus metrics example
+metrics:
+  - name: processing_time_seconds
+    help: "Time taken to process a field"
+    type: histogram
+  - name: successful_zonings_total
+    help: "Total number of successful zoning operations"
+    type: counter
+```
 
 This deployment guide ensures consistent, secure, and maintainable installations across all supported platforms while maintaining ISO 42001 compliance requirements.

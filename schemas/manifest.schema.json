@@ -1,180 +1,169 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "PASCAL NDVI Block Manifest",
-    "type": "object",
-    "required": ["name", "version", "description", "interfaces"],
-    "properties": {
-        "name": {
-            "type": "string",
-            "description": "The name of the block"
-        },
-        "version": {
-            "type": "string",
-            "pattern": "^\\d+\\.\\d+\\.\\d+$",
-            "description": "Semantic version of the block"
-        },
-        "description": {
-            "type": "string",
-            "description": "Brief description of the block's functionality"
-        },
-        "interfaces": {
-            "type": "object",
-            "required": ["input", "output"],
-            "properties": {
-                "input": {
-                    "type": "object",
-                    "required": ["raster", "parameters"],
-                    "properties": {
-                        "raster": {
-                            "type": "object",
-                            "required": ["type", "bands", "validation"],
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["GeoTIFF"]
-                                },
-                                "bands": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string",
-                                        "enum": ["RED", "NIR"]
-                                    },
-                                    "minItems": 2,
-                                    "maxItems": 2
-                                },
-                                "validation": {
-                                    "type": "object",
-                                    "required": ["required", "format"],
-                                    "properties": {
-                                        "required": {
-                                            "type": "boolean"
-                                        },
-                                        "format": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string",
-                                                "pattern": "^\\*\\.tiff?$"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "parameters": {
-                            "type": "object",
-                            "required": ["index", "L"],
-                            "properties": {
-                                "index": {
-                                    "type": "object",
-                                    "required": ["type", "enum", "default"],
-                                    "properties": {
-                                        "type": {
-                                            "type": "string",
-                                            "enum": ["string"]
-                                        },
-                                        "enum": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string",
-                                                "enum": ["ndvi", "savi"]
-                                            }
-                                        },
-                                        "default": {
-                                            "type": "string",
-                                            "enum": ["ndvi"]
-                                        }
-                                    }
-                                },
-                                "L": {
-                                    "type": "object",
-                                    "required": ["type", "description", "minimum", "maximum", "default"],
-                                    "properties": {
-                                        "type": {
-                                            "type": "string",
-                                            "enum": ["number"]
-                                        },
-                                        "description": {
-                                            "type": "string"
-                                        },
-                                        "minimum": {
-                                            "type": "number",
-                                            "minimum": 0
-                                        },
-                                        "maximum": {
-                                            "type": "number",
-                                            "maximum": 1
-                                        },
-                                        "default": {
-                                            "type": "number",
-                                            "minimum": 0,
-                                            "maximum": 1
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PASCAL Zoning ML Manifest",
+  "type": "object",
+  "required": ["name", "version", "description", "interfaces"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the pipeline or module"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9]+)?$",
+      "description": "Semantic version (e.g., 1.2.3 or 1.2.3-alpha)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of Pascal Zoning ML"
+    },
+    "interfaces": {
+      "type": "object",
+      "required": ["input", "output"],
+      "properties": {
+        "input": {
+          "type": "object",
+          "required": ["raster", "indices", "parameters"],
+          "properties": {
+            "raster": {
+              "type": "object",
+              "required": ["type", "bands", "validation"],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["GeoTIFF"],
+                  "description": "Input raster format"
                 },
-                "output": {
-                    "type": "object",
-                    "required": ["raster", "log"],
-                    "properties": {
-                        "raster": {
-                            "type": "object",
-                            "required": ["type", "bands", "validation"],
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["GeoTIFF"]
-                                },
-                                "bands": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string",
-                                        "enum": ["INDEX"]
-                                    },
-                                    "minItems": 1,
-                                    "maxItems": 1
-                                },
-                                "validation": {
-                                    "type": "object",
-                                    "required": ["format"],
-                                    "properties": {
-                                        "format": {
-                                            "type": "string",
-                                            "pattern": "^\\*\\.tif$"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "log": {
-                            "type": "object",
-                            "required": ["type", "format", "validation"],
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["file"]
-                                },
-                                "format": {
-                                    "type": "string",
-                                    "pattern": "^\\*\\.log$"
-                                },
-                                "validation": {
-                                    "type": "object",
-                                    "required": ["schema"],
-                                    "properties": {
-                                        "schema": {
-                                            "type": "string",
-                                            "enum": ["ISO42001"]
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                "bands": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["SWIR", "NIR", "RED_EDGE", "RED", "GREEN"]
+                  },
+                  "minItems": 5,
+                  "maxItems": 5,
+                  "description": "List of required bands for NDVI/NDWI/NDRE/SI"
+                },
+                "validation": {
+                  "type": "object",
+                  "required": ["required", "format"],
+                  "properties": {
+                    "required": {
+                      "type": "boolean",
+                      "description": "Whether the raster is required"
+                    },
+                    "format": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^\\*\\.tiff?$"
+                      },
+                      "description": "Allowed file extensions"
                     }
+                  }
                 }
+              }
+            },
+            "indices": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["NDVI", "NDWI", "NDRE", "SI"]
+              },
+              "minItems": 1,
+              "description": "Spectral indices to compute or ingest"
+            },
+            "parameters": {
+              "type": "object",
+              "required": ["force_k", "min_zone_size_ha", "max_zones", "points_per_zone", "use_pca"],
+              "properties": {
+                "force_k": {
+                  "type": ["integer", "null"],
+                  "minimum": 2,
+                  "description": "Force K-Means to use exactly this number of clusters (null = auto)"
+                },
+                "min_zone_size_ha": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Minimum zone area in hectares"
+                },
+                "max_zones": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "description": "Maximum number of clusters to evaluate automatically"
+                },
+                "points_per_zone": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Minimum sampling points per zone"
+                },
+                "use_pca": {
+                  "type": "boolean",
+                  "description": "Enable PCA on stacked indices to retain 95% variance"
+                }
+              }
             }
+          }
+        },
+        "output": {
+          "type": "object",
+          "required": ["geopackages", "csv", "json", "png", "log"],
+          "properties": {
+            "geopackages": {
+              "type": "object",
+              "required": ["zonificacion_agricola", "puntos_muestreo"],
+              "properties": {
+                "zonificacion_agricola": {
+                  "type": "string",
+                  "pattern": "^.*\\.gpkg$",
+                  "description": "GeoPackage of zone polygons"
+                },
+                "puntos_muestreo": {
+                  "type": "string",
+                  "pattern": "^.*\\.gpkg$",
+                  "description": "GeoPackage of sampling point geometries"
+                }
+              }
+            },
+            "csv": {
+              "type": "string",
+              "pattern": "^.*\\.csv$",
+              "description": "CSV with per-zone statistics"
+            },
+            "json": {
+              "type": "string",
+              "pattern": "^.*\\.json$",
+              "description": "JSON with clustering metrics"
+            },
+            "png": {
+              "type": "object",
+              "required": ["mapa_clusters", "zonificacion_results"],
+              "properties": {
+                "mapa_ndvi": {
+                  "type": ["string", "null"],
+                  "pattern": "^.*\\.png$",
+                  "description": "PNG of NDVI map (if provided)"
+                },
+                "mapa_clusters": {
+                  "type": "string",
+                  "pattern": "^.*\\.png$",
+                  "description": "PNG of cluster map"
+                },
+                "zonificacion_results": {
+                  "type": "string",
+                  "pattern": "^.*\\.png$",
+                  "description": "Overview composite PNG (map + bar chart)"
+                }
+              }
+            },
+            "log": {
+              "type": "string",
+              "pattern": "^.*\\.log$",
+              "description": "Log file for ISO 42001 traceability"
+            }
+          }
         }
+      }
     }
+  }
 }
