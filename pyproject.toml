@@ -43,6 +43,5 @@ extend-ignore = ["E203", "W503"]  # conflictos conocidos Black ↔ flake-8
 
 [tool.mypy]
 # Desactiva únicamente el chequeo de genéricos sin parámetros.
-disable_error_code = ["type-arg"]
-
+ignore_missing_type_args = true
 
