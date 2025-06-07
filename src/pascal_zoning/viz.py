@@ -2,6 +2,8 @@
 
 # Importaciones de la librería estándar
 from pathlib import Path
+import typing
+import collections.abc
 
 # Importaciones de terceros
 import matplotlib.pyplot as plt
@@ -57,7 +59,7 @@ def zoning_overview(
 
             poly = row.geometry
             if isinstance(poly, MultiPolygon):
-                for parte in poly.geoms:
+                for parte in typing.cast(collections.abc.Iterable[Polygon], poly.geoms):
                     exterior_geom: LinearRing = parte.exterior
                     x_poly, y_poly = exterior_geom.xy
                     axes[0].fill(
