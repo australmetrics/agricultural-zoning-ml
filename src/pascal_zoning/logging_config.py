@@ -1,14 +1,17 @@
-"""
-Logging estructurado ISO-42001 para Agri-Zoning.
-"""
+"""Logging estructurado ISO-42001 para Agri-Zoning."""
 
 from loguru import logger
-import sys  # ← Importar sys directamente
+import sys
 from pathlib import Path
 from datetime import datetime
 
 
 def setup_logging(output_dir: Path) -> None:
+    """Configura el sistema de logging estructurado.
+
+    Args:
+        output_dir: Directorio donde se almacenarán los logs.
+    """
     log_dir = Path(output_dir) / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -28,6 +31,6 @@ def setup_logging(output_dir: Path) -> None:
 
     logger.remove()  # Borra handlers por defecto
     logger.add(file_path, format=fmt_file, level="INFO", enqueue=True)
-    logger.add(sys.stderr, format=fmt_console, level="INFO")  # ← Usar sys.stderr
+    logger.add(sys.stderr, format=fmt_console, level="INFO")
 
-    logger.info("Logging inicializado")
+    logger.info("Logging inicializado.")

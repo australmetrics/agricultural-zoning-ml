@@ -6,7 +6,6 @@
 
 import numpy as np
 import pytest
-from pathlib import Path
 from shapely.geometry import Polygon
 import geopandas as gpd
 

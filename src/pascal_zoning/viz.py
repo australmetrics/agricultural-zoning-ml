@@ -1,13 +1,17 @@
-"""
-Rutinas de visualización centralizadas (matplotlib only).
-"""
+"""Rutinas de visualización centralizadas para zonificación agronómica."""
 
+# Importaciones de la librería estándar
 from pathlib import Path
+
+# Importaciones de terceros
 import matplotlib.pyplot as plt
+import matplotlib
 import geopandas as gpd
-import numpy as np
+from shapely.geometry import MultiPolygon, Polygon
 from loguru import logger
-from shapely.geometry import Polygon, MultiPolygon
+
+# Configurar backend no interactivo antes de crear figuras
+matplotlib.use("Agg")
 
 
 def zoning_overview(
@@ -15,14 +19,11 @@ def zoning_overview(
     samples: gpd.GeoDataFrame,
     out_png: Path,
 ) -> None:
-    """
-    Dibuja un gráfico con dos paneles:
-      1) Mapa de zonas con puntos de muestreo superpuestos.
-      2) Gráfico de barras mostrando el área de cada zona.
+    """Dibuja dos paneles: mapa de zonas con muestras superpuestas y área por zona.
 
-    Cada barra en el panel 2 tiene el mismo color que la zona correspondiente en el panel 1.
-
-    Guarda el resultado en `out_png`.
+    Asegura que cada barra del gráfico de áreas use el mismo color de la zona
+    correspondiente en el mapa de polígonos. Guarda la imagen resultante en
+    `out_png`.
     """
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 
@@ -45,9 +46,8 @@ def zoning_overview(
         # Número de zonas (clusters)
         n_zonas = len(zones)
 
-        # Tomamos una paleta discreta: "tab10"
+        # Paleta discreta "tab10"
         base_cmap = plt.get_cmap("tab10")
-        # Generamos una lista de colores llamando al colormap con índices enteros
         colores = [base_cmap(i) for i in range(n_zonas)]
 
         # Dibujar cada zona manualmente usando esos colores
@@ -100,7 +100,7 @@ def zoning_overview(
     if not samples.empty:
         samples.plot(ax=axes[0], color="black", markersize=5)
 
-    axes[0].set_title("Zonificación agronómica")
+    axes[0].set_title("Zonificación agronómica.")
 
     # PANEL 2: Barplot de áreas por zona
     if not zones.empty:
@@ -113,7 +113,7 @@ def zoning_overview(
         cluster_ids = zones_sorted["cluster"].tolist()
         areas_ha = zones_sorted["area_ha"].tolist()
 
-        # Reutilizamos la misma paleta "tab10" para generar colores en orden
+        # Paleta "tab10" para generar colores en orden
         base_cmap = plt.get_cmap("tab10")
         colores = [base_cmap(i) for i in cluster_ids]
 
@@ -124,7 +124,7 @@ def zoning_overview(
         axes[1].set_xticklabels([str(cid) for cid in cluster_ids])
         axes[1].set_xlabel("Zona")
         axes[1].set_ylabel("Área (ha)")
-        axes[1].set_title("Área por zona")
+        axes[1].set_title("Área por zona.")
 
     plt.tight_layout()
     plt.savefig(
@@ -136,4 +136,4 @@ def zoning_overview(
         pad_inches=0,
     )
     plt.close(fig)
-    logger.info(f"Visualización guardada en {out_png}")
+    logger.info(f"Visualización guardada en {out_png}.")

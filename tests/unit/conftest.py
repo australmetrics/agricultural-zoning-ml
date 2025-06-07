@@ -1,7 +1,6 @@
 # tests/unit/conftest.py
 import pytest
 import numpy as np
-import geopandas as gpd
 from shapely.geometry import Polygon
 
 

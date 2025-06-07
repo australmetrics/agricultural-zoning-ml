@@ -35,7 +35,7 @@ try {
 
 Write-Step "Ejecutando tests con cobertura"
 try {
-    pytest tests/ --cov=pascal_ndvi_block --cov-report=xml --cov-report=term-missing:skip-covered
+    pytest tests/ --cov=pascal_zoning --cov-report=xml --cov-report=term-missing:skip-covered
 } catch {
     $success = $false
     Write-Host "❌ Error en tests" -ForegroundColor $colors.Error
@@ -59,7 +59,12 @@ try {
 
 Write-Step "Verificando dependencias"
 try {
-    safety check
+    # Asegúrate de que 'safety' esté instalado en tu PATH
+    if (-not (Get-Command safety -ErrorAction SilentlyContinue)) {
+        pip install safety
+    }
+    # Usar 'scan' en vez de 'check' (sin prompt de login):
+    safety scan --full-report --file=requirements.txt
 } catch {
     $success = $false
     Write-Host "❌ Error en verificación de dependencias" -ForegroundColor $colors.Error
@@ -68,7 +73,7 @@ try {
 # Compliance Check
 Write-Step "Verificando cumplimiento ISO 42001"
 $requiredFiles = @(
-    "src/logging_config.py",
+    "src/pascal_zoning/logging_config.py",
     "docs/compliance/iso42001_compliance.md",
     "README.md",
     "CHANGELOG.md",

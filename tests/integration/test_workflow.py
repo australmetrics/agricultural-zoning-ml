@@ -1,18 +1,16 @@
-# tests/integration/test_workflow.py
-
 import subprocess
 import sys
 import shutil
 from pathlib import Path
 
 import numpy as np
+import pytest
 import rasterio
 from rasterio.transform import from_origin
-import pytest
 
 
 # ------------------------------------------------------------------ #
-# --------- Generar un TIFF sintético 6‐bandas de 2×2 píxeles -------- #
+# Generar un TIFF sintético 6-bandas de 2×2 píxeles                 #
 # ------------------------------------------------------------------ #
 def create_multiband_tif_for_workflow(path: Path) -> None:
     """
@@ -40,7 +38,7 @@ def create_multiband_tif_for_workflow(path: Path) -> None:
 
 
 # ------------------------------------------------------------------ #
-# ---------------- Repo temporal con setup.py mínimo ---------------- #
+# Repo temporal con setup.py mínimo                                  #
 # ------------------------------------------------------------------ #
 @pytest.fixture
 def git_root(tmp_path):
@@ -72,7 +70,7 @@ def git_root(tmp_path):
 
 
 # ------------------------------------------------------------------ #
-# -------------------  TEST de flujo completo ---------------------- #
+# TEST de flujo completo                                               #
 # ------------------------------------------------------------------ #
 def test_cli_workflow_creates_outputs(git_root, tmp_path):
     """
@@ -89,7 +87,9 @@ def test_cli_workflow_creates_outputs(git_root, tmp_path):
     outputs_dir = tmp_path / "integration_outputs"
 
     # 3) Construir el comando CLI con la firma actual:
-    #    pascal_zoning.pipeline run --raster … --indices … --output-dir … --force-k … --min-zone-size …
+    # pascal_zoning.pipeline run \
+    #   --raster … --indices … \
+    #   --output-dir … --force-k … --min-zone-size …
     cmd = [
         sys.executable,
         "-m",
@@ -118,8 +118,8 @@ def test_cli_workflow_creates_outputs(git_root, tmp_path):
     assert proc.returncode == 0, f"CLI devolvió error:\n{proc.stderr}"
 
     # 4) “outputs_dir” contendrá subdirectorios timestamped como:
-    #      outputs/20250604_193139_k2_mz0.00005/
-    #    Capturamos el primer (y único) directorio creado allí:
+    #    outputs/20250604_193139_k2_mz0.00005/
+    # Capturamos el primer (y único) directorio creado allí:
     timestamped_dirs = [d for d in outputs_dir.iterdir() if d.is_dir()]
     assert timestamped_dirs, "No se creó ningún subdirectorio dentro de outputs_dir"
     exec_dir = timestamped_dirs[0]
@@ -131,7 +131,7 @@ def test_cli_workflow_creates_outputs(git_root, tmp_path):
         "mapa_clusters.png",
         "estadisticas_zonas.csv",
         "metricas_clustering.json",
-        "zonificacion_results.png",  # incluye el PNG de resumen
+        "zonificacion_results.png",
     }
     produced = {p.name for p in exec_dir.iterdir() if p.is_file()}
     missing = expected - produced

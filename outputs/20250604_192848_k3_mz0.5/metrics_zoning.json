@@ -1,9 +1,0 @@
-{
-  "n_clusters": 3,
-  "silhouette": 0.8211252093315125,
-  "calinski_harabasz": 4911.73828125,
-  "inertia": 238.94261169433594,
-  "size_0": 188,
-  "size_1": 451,
-  "size_2": 160
-}

@@ -1,20 +1,19 @@
 # tests/unit/test_viz.py
-import geopandas as gpd
-import numpy as np
-import pandas as pd
-import matplotlib
 
-matplotlib.use("Agg")  # para asegurar backend no interactivo
+import matplotlib
+import geopandas as gpd
 from shapely.geometry import Polygon, Point
-from pathlib import Path
 from pascal_zoning.viz import zoning_overview
+
+# Configurar backend no interactivo después de las importaciones
+matplotlib.use("Agg")
 
 
 def test_zoning_overview_creates_png(tmp_path):
     """
     Creamos dos GeoDataFrames mínimos:
-    - zones_gdf: 2 polígonos rectangulares
-    - samples_gdf: 3 puntos
+    - zones_gdf: 2 polígonos rectangulares.
+    - samples_gdf: 2 puntos.
     Llamamos a zoning_overview(...) y verificamos que el PNG exista.
     """
     # 1) Construir una GeoDataFrame de zonas con 2 polígonos triviales
@@ -33,13 +32,14 @@ def test_zoning_overview_creates_png(tmp_path):
     # 2) Construir una GeoDataFrame de muestras (un punto en cada zona)
     pts = [Point(0.5, 0.5), Point(1.5, 0.5)]
     samples_gdf = gpd.GeoDataFrame(
-        {"zone_name": ["Zona_00", "Zona_01"]}, geometry=pts, crs="EPSG:32719"
+        {"zone_name": ["Zona_00", "Zona_01"]},
+        geometry=pts,
+        crs="EPSG:32719",
     )
 
     output_file = tmp_path / "test_overview.png"
     zoning_overview(zones_gdf, samples_gdf, output_file)
 
-    # Verificamos que el archivo PNG se haya creado
-    assert output_file.exists()
-    # Opcional: podemos comprobar que no está vacío (tamaño > 0 bytes)
-    assert output_file.stat().st_size > 0
+    # Verificamos que el archivo PNG se haya creado y no esté vacío
+    assert output_file.exists(), "El archivo PNG no fue generado."
+    assert output_file.stat().st_size > 0, "El archivo PNG está vacío."
