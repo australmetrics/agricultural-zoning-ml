@@ -72,7 +72,7 @@ def zoning_overview(
                         x_h, y_h = hole.xy
                         axes[0].fill(x_h, y_h, facecolor="white")
             elif isinstance(poly, Polygon):
-                exterior_geom: LinearRing = parte.exterior
+                exterior_geom: LinearRing = poly.exterior
                 x_poly, y_poly = exterior_geom.xy
                 axes[0].fill(
                     x_poly,
@@ -81,7 +81,7 @@ def zoning_overview(
                     edgecolor="black",
                     linewidth=0.5,
                 )
-                for hole in poly.interiors:
+                for hole in list(poly.interiors):
                     x_h, y_h = hole.xy
                     axes[0].fill(x_h, y_h, facecolor="white")
 
