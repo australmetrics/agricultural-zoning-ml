@@ -22,7 +22,7 @@ coverage==7.0.0
 flake8==6.0.0
 black==24.3.0          # ReDoS corregido en 24.3.0
 mypy==1.0.0
-types-geopandas==0.13.0
+types-geopandas==1.0.1.20250601
 pydocstyle==6.0.0
 bandit==1.7.7          # SQLi false-positive corregido en 1.7.7
 twine==4.0.0
