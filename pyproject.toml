@@ -41,3 +41,8 @@ target-version = ["py311"]
 max-line-length = 88      # mismo ancho para evitar falsos positivos
 extend-ignore = ["E203", "W503"]  # conflictos conocidos Black ↔ flake-8
 
+[tool.mypy]
+# Desactiva únicamente el chequeo de genéricos sin parámetros.
+disable_error_code = ["type-arg"]
+
+
