@@ -7,7 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib
 import geopandas as gpd
-from shapely.geometry import MultiPolygon, Polygon
+from shapely.geometry import MultiPolygon, Polygon, LinearRing
 from loguru import logger
 
 # Configurar backend no interactivo antes de crear figuras
@@ -58,7 +58,8 @@ def zoning_overview(
             poly = row.geometry
             if isinstance(poly, MultiPolygon):
                 for parte in poly.geoms:
-                    x_poly, y_poly = parte.exterior.xy
+                    exterior_geom: LinearRing = parte.exterior
+                    x_poly, y_poly = exterior_geom.xy
                     axes[0].fill(
                         x_poly,
                         y_poly,
@@ -71,7 +72,8 @@ def zoning_overview(
                         x_h, y_h = hole.xy
                         axes[0].fill(x_h, y_h, facecolor="white")
             elif isinstance(poly, Polygon):
-                x_poly, y_poly = poly.exterior.xy
+                exterior_geom: LinearRing = parte.exterior
+                x_poly, y_poly = exterior_geom.xy
                 axes[0].fill(
                     x_poly,
                     y_poly,
