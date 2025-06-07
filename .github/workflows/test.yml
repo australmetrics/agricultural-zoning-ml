@@ -36,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install black==24.4.2 flake8==7.0.0 mypy==1.10.0 pytest coverage
+          pip install black==24.4.2 flake8==7.0.0 mypy==1.10.0
 
       # 4. Verifica formateo con Black (88 c.)
       - name: Check code formatting
