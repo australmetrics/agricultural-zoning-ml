@@ -70,7 +70,7 @@ def zoning_overview(
                         linewidth=0.5,
                     )
                     # Dibujar agujeros si hubiera
-                    for hole in parte.interiors:
+                    for hole in list(parte.interiors):
                         x_h, y_h = hole.xy
                         axes[0].fill(x_h, y_h, facecolor="white")
             elif isinstance(poly, Polygon):
