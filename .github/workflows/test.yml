@@ -2,52 +2,68 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
-  workflow_dispatch:
 
 jobs:
   test:
+    name: test (${{ matrix.python-version }})
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        python-version: ['3.11']
+        python-version: ["3.11"]
+
     steps:
+      # 1. Obtiene el código
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. Configura Python con caché de pip
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: "pip"
 
+      # 3. Instala dependencias de producción y de desarrollo
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # Dependencias principales
           pip install -r requirements.txt
-          pip install pytest pytest-cov flake8 mypy black
+          # Dependencias de desarrollo (si existen)
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          # Herramientas de calidad
+          pip install black==24.4.2 flake8==7.0.0 mypy==1.10.0 pytest coverage
 
+      # 4. Verifica formateo con Black (88 c.)
       - name: Check code formatting
-        run: black --check .
+        run: black --check src/ tests/
 
+      # 5. Análisis estático con mypy (modo estricto)
       - name: Run type checking
-        run: mypy src/
+        run: mypy --strict src/
 
+      # 6. Linting con flake-8 (respeta line-length 88)
       - name: Run linting
         run: flake8 src/
 
+      # 7. Tests + cobertura
       - name: Run tests with coverage
-        run: pytest -v --cov=src --cov-report=xml --cov-report=term
+        run: |
+          coverage run -m pytest
+          coverage xml
 
+      # 8. (Opcional) Sube cobertura a Codecov si configuraste el token
       - name: Upload coverage to Codecov
+        if: ${{ secrets.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v4
         with:
-          file: coverage.xml
-          fail_ci_if_error: true
-          verbose: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          flags: unittests
+
 
   notify:
     needs: [test]
