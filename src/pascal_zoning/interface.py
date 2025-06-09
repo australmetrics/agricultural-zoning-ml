@@ -100,7 +100,7 @@ class NDVIBlockInterface:
         Verifica que:
         1) El diccionario no esté vacío.
         2) Cada arreglo sea numpy.float con la misma forma.
-        3) El porcentaje válido supere `quality_threshold`; emite warning en caso contrario.
+        3) El porcentaje válido supere `quality_threshold`; sino warning.
 
         Args:
             indices: Diccionario con arrays para cada índice.
