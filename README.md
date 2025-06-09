@@ -1,6 +1,6 @@
 # Pascal Zoning (Agricultural Zoning ML)
 
-A machine learning–powered system for generating agricultural management zones and optimized sampling points based on spectral‐index analysis. Part of the **`pascal-zoning-ml`** repository, this project complies with ISO 42001 (AI Management System Standard).
+A machine learning–powered system for generating agricultural management zones and optimized sampling points based on spectral‐index analysis. Part of the **`pascal-zoning-ml`** repository, this project complies with ISO 42001 (AI Management System Standard)..
 
 ---
 
