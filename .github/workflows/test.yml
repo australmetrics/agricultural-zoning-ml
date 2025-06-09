@@ -17,6 +17,7 @@ jobs:
     # ─── Exponemos el secreto como variable de entorno ───────────────
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      NO_COLOR: "1"
 
     steps:
       # 1. Obtiene el código
