@@ -26,7 +26,7 @@ header_pages:
 # GitHub Pages settings
 github:
   is_project_page: true
-  repository_url: https://github.com/australmetrics/agri-zoning-ml
+  repository_url: hhttps://github.com/australmetrics/agricultural-zoning-ml
 
 # Additional settings
 show_downloads: true
