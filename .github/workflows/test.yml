@@ -48,6 +48,8 @@ jobs:
       # 6. Linting con flake-8 (respeta line-length 88)
       - name: Run linting
         run: flake8 src/
+        env:
+          FLAKE8_MAX_LINE_LENGTH: 88        
 
       # 7. Tests + cobertura
       - name: Run tests with coverage
