@@ -11,7 +11,7 @@ from __future__ import annotations
 # Importaciones de la librería estándar
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 # Importaciones de terceros
 import numpy as np
@@ -56,8 +56,8 @@ class ZoningPipeline:
 
     def __init__(
         self,
-        config: ZoningConfig | None = None,
-        config_path: Path | None = None,
+        config: Optional[ZoningConfig] = None,
+        config_path: Optional[Path] = None,
     ) -> None:
         """Inicializa con configuración o ruta a JSON."""
         self.config: ZoningConfig = config or load_config(config_path)
@@ -68,8 +68,8 @@ class ZoningPipeline:
         raster_path: Path,
         index_names: List[str],
         output_dir: Path,
-        force_k: int | None = None,
-        min_zone_size: float | None = None,
+        force_k: Optional[int] = None,
+        min_zone_size: Optional[float] = None,
     ) -> ZoningResult:
         """Ejecuta zonificación completa y retorna un ZoningResult."""
         ahora = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -165,13 +165,13 @@ def run(
             "Cadena por coma de índices a usar. " f"Valores permitidos: {VALID_INDICES}"
         ),
     ),
-    force_k: int | None = typer.Option(
+    force_k: Optional[int] = typer.Option(
         None,
         "--force-k",
         "-k",
         help="Si se pasa, fuerza ese número de clusters",
     ),
-    min_zone_size: float | None = typer.Option(
+    min_zone_size: Optional[float] = typer.Option(
         None,
         "--min-zone-size",
         help=(
@@ -240,13 +240,13 @@ def zonificar(
             f"Valores posibles: {VALID_INDICES}"
         ),
     ),
-    force_k: int | None = typer.Option(
+    force_k: Optional[int] = typer.Option(
         None,
         "--force-k",
         "-k",
         help="Si se especifica, fuerza este número específico de clusters.",
     ),
-    min_zone_size: float | None = typer.Option(
+    min_zone_size: Optional[float] = typer.Option(
         None,
         "--min-zone-size",
         help=(
