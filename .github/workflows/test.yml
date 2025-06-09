@@ -46,7 +46,8 @@ jobs:
         run: mypy --strict src/
 
       # 6. Linting con flake-8 (respeta line-length 88)
-      - name: Run linting              
+      - name: Run linting      
+        run: flake8 src/        
 
       # 7. Tests + cobertura
       - name: Run tests with coverage
