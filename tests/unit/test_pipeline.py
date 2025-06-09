@@ -12,4 +12,4 @@ def test_help_command() -> None:
     assert "--raster" in result.output
     assert "--indices" in result.output
     # --block-path quedó obsoleto y ya no se comprueba
-    assert "--output" in result.output
+    assert "--output-dir" in result.output
