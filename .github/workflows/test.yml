@@ -16,8 +16,7 @@ jobs:
 
     # ─── Exponemos el secreto como variable de entorno ───────────────
     env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      NO_COLOR: "1"
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}      
 
     steps:
       # 1. Obtiene el código
@@ -53,6 +52,8 @@ jobs:
 
       # 7. Tests + cobertura
       - name: Run tests with coverage
+        env:
+          NO_COLOR: "1"
         run: |
           coverage run -m pytest
           coverage xml
