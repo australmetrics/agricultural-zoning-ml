@@ -10,10 +10,10 @@ def test_help_command() -> None:
     result = runner.invoke(
         app,
         ["run", "--help"],
-        color=False,                 # desactiva Click
+        color=False,  # desactiva Click
         env={
-            "NO_COLOR": "1",         # estándar, respeta Rich ≥ 13
-            "RICH_NO_COLOR": "1",    # fallback explícito para Rich
+            "NO_COLOR": "1",  # estándar, respeta Rich ≥ 13
+            "RICH_NO_COLOR": "1",  # fallback explícito para Rich
         },
     )
 
