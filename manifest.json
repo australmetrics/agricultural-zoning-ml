@@ -13,109 +13,33 @@
         },
         "description": "Clipped GeoTIFF of the field (all bands needed for NDVI, NDWI, NDRE, SI)."
       },
-      "indices": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "enum": ["NDVI", "NDWI", "NDRE", "SI"]
-        },
-        "validation": {
-          "required": true,
-          "minItems": 1
-        },
-        "description": "Comma-separated list of spectral indices to compute or ingest (e.g., [\"NDVI\",\"NDWI\",\"NDRE\",\"SI\"])."
-      },
+      "indices": [
+        "NDVI",
+        "NDWI",
+        "NDRE",
+        "SI"
+      ],
       "parameters": {
-        "type": "object",
-        "properties": {
-          "force_k": {
-            "type": ["integer", "null"],
-            "description": "Force K-Means to use exactly this number of clusters. If null, automatic k selection is used.",
-            "minimum": 2
-          },
-          "min_zone_size_ha": {
-            "type": "number",
-            "description": "Minimum zone area in hectares. Zones smaller than this will be filtered out.",
-            "minimum": 0,
-            "default": 0.5
-          },
-          "max_zones": {
-            "type": "integer",
-            "description": "Maximum number of clusters (zones) to evaluate automatically.",
-            "minimum": 2,
-            "default": 10
-          },
-          "points_per_zone": {
-            "type": "integer",
-            "description": "Minimum number of sampling points to generate per zone.",
-            "minimum": 1,
-            "default": 5
-          },
-          "use_pca": {
-            "type": "boolean",
-            "description": "If true, perform PCA on the stacked indices to retain 95% of variance before clustering.",
-            "default": false
-          }
-        },
-        "required": ["min_zone_size_ha", "max_zones", "points_per_zone", "use_pca"]
+        "force_k": null,
+        "min_zone_size_ha": 0.5,
+        "max_zones": 10,
+        "points_per_zone": 5,
+        "use_pca": false
       }
     },
     "output": {
       "geopackages": {
-        "type": "object",
-        "properties": {
-          "zonificacion_agricola": {
-            "type": "string",
-            "format": "*.gpkg",
-            "description": "GeoPackage containing management zone polygons"
-          },
-          "puntos_muestreo": {
-            "type": "string",
-            "format": "*.gpkg",
-            "description": "GeoPackage containing sampling point geometries and index values"
-          }
-        },
-        "required": ["zonificacion_agricola", "puntos_muestreo"]
+        "zonificacion_agricola": "zonificacion.gpkg",
+        "puntos_muestreo": "puntos_muestreo.gpkg"
       },
-      "csv": {
-        "type": "string",
-        "format": "*.csv",
-        "description": "CSV file with per-zone statistics (zone_id, area_ha, perimeter_m, compactness, <Index>_mean, <Index>_std)."
-      },
-      "json": {
-        "type": "string",
-        "format": "*.json",
-        "description": "JSON file containing clustering metrics (n_clusters, silhouette, calinski_harabasz, inertia, cluster_sizes, timestamp)."
-      },
+      "csv": "stats.csv",
+      "json": "metrics.json",
       "png": {
-        "type": "object",
-        "properties": {
-          "mapa_ndvi": {
-            "type": ["string", "null"],
-            "format": "*.png",
-            "description": "PNG of NDVI map (only if NDVI was provided)."
-          },
-          "mapa_clusters": {
-            "type": "string",
-            "format": "*.png",
-            "description": "PNG of cluster map (zones colored by cluster ID)."
-          },
-          "zonificacion_results": {
-            "type": "string",
-            "format": "*.png",
-            "description": "Composite overview PNG (cluster map + bar chart of zone areas)."
-          }
-        },
-        "required": ["mapa_clusters", "zonificacion_results"]
+        "mapa_ndvi": null,
+        "mapa_clusters": "clusters.png",
+        "zonificacion_results": "results.png"
       },
-      "log": {
-        "type": "string",
-        "format": "*.log",
-        "validation": {
-          "schema": "ISO42001"
-        },
-        "description": "Log file capturing detailed processing steps with timestamps for traceability."
-      }
+      "log": "process.log"
     }
   }
 }
