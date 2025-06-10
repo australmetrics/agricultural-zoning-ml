@@ -22,3 +22,7 @@ aux_links:
     - "https://github.com/australmetrics/agricultural-zoning-ml"
 
 search_enabled: true
+
+# Excluir archivos problemáticos
+exclude:
+  - examples/advanced_examples.md
