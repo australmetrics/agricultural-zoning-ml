@@ -3,6 +3,13 @@
 A machine learning–powered system for generating agricultural management zones and optimized sampling points based on spectral‐index analysis. Part of the **`pascal-zoning-ml`** repository, this project complies with ISO 42001 (AI Management System Standard)..
 
 ---
+## Project Status
+
+[![CI & Lint](https://github.com/australmetrics/agricultural-zoning-ml/actions/workflows/ci.yaml/badge.svg)](https://github.com/australmetrics/agricultural-zoning-ml/actions/workflows/ci.yaml)
+[![codecov](https://codecov.io/gh/australmetrics/agricultural-zoning-ml/branch/main/graph/badge.svg)](https://codecov.io/gh/australmetrics/agricultural-zoning-ml)
+[![ISO 42001](https://img.shields.io/badge/ISO-42001-blue.svg)](docs/compliance/iso42001_compliance.md)
+
+
 
 ## 🌾 Overview
 
