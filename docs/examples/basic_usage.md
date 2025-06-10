@@ -1,3 +1,7 @@
+---
+title: Basic Usage
+nav_order: 6
+---
 # Basic Usage
 
 This guide expands on **Simple Usage** by showing additional CLI flags, configuration file support, environment‐variable overrides, and richer Python‐API options. We assume you have Pascal Zoning ML installed (either via `pip install -e .` or from PyPI) and a working GeoTIFF or precomputed index arrays.

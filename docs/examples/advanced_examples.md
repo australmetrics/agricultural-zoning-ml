@@ -1,3 +1,7 @@
+---
+title: Advanced Example
+nav_order: 7
+---
 # Advanced Examples
 
 This document demonstrates **advanced use‐cases** of Pascal Zoning ML, including:

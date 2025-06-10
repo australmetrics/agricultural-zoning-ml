@@ -1,3 +1,8 @@
+---
+title: API Documentation
+nav_order: 4
+---
+
 # API Documentation
 
 This document describes the public Python API of Pascal Zoning ML, detailing classes, methods, and data structures that users can invoke programmatically.

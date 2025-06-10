@@ -1,7 +1,6 @@
 ---
-layout: default
-title: Agricultural Zoning ML Documentation
-description: Precision agriculture zoning and vegetation index analysis system
+title: Home
+nav_order: 1
 ---
 
 # Agricultural Zoning ML Documentation

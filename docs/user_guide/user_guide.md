@@ -1,5 +1,6 @@
 ---
-title: "User Guide for PASCAL Agri-Zoning"
+title: User Guide
+nav_order: 3
 ---
 
 # PASCAL Agri-Zoning User Guide

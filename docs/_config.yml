@@ -1,9 +1,7 @@
-theme: jekyll-theme-cayman
+remote_theme: just-the-docs/just-the-docs
 plugins:
   - jekyll-remote-theme
   - jekyll-optional-front-matter
-  - jekyll-default-layout
-  - jekyll-titles-from-headings
 
 markdown: kramdown
 kramdown:
@@ -13,21 +11,14 @@ kramdown:
 title: Agricultural Zoning ML Documentation
 description: Precision agriculture zoning and vegetation index analysis system
 
-# Navigation
-header_pages:
-  - index.md
-  - user_guide/quick_start.md
-  - user_guide/user_guide.md
-  - technical/api_documentation.md
-  - technical/architecture_overview.md
-  - examples/basic_usage.md
-  - examples/advanced_examples.md
-
 # GitHub Pages settings
 github:
   is_project_page: true
   repository_url: https://github.com/australmetrics/agricultural-zoning-ml
 
-# Additional settings
-show_downloads: true
+# Just the Docs settings
+aux_links:
+  "Ver en GitHub":
+    - "https://github.com/australmetrics/agricultural-zoning-ml"
 
+search_enabled: true

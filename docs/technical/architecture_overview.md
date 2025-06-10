@@ -1,3 +1,8 @@
+---
+title: Architecture Overview
+nav_order: 5
+---
+
 # Visión General de la Arquitectura
 
 Este documento proporciona una visión general de alto nivel de la arquitectura del sistema Pascal Zoning ML.
