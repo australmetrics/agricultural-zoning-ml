@@ -3,6 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/pascal-zoning)](https://pypi.org/project/pascal-zoning/) 
 [![License](https://img.shields.io/github/license/australmetrics/agricultural-zoning-ml)](https://github.com/australmetrics/agricultural-zoning-ml/blob/main/LICENSE) 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/australmetrics/agricultural-zoning-ml/validate-manifest.yml)](https://github.com/australmetrics/agricultural-zoning-ml/actions/workflows/validate-manifest.yml)
+[![Verificación de Calidad ISO 42001](https://img.shields.io/github/actions/workflow/status/australmetrics/agricultural-zoning-ml/validate-manifest.yml?label=Verificación%20de%20Calidad%20ISO%2042001&logo=github)]
 [![Codecov](https://img.shields.io/codecov/c/github/australmetrics/agricultural-zoning-ml?logo=codecov)](https://codecov.io/gh/australmetrics/agricultural-zoning-ml)
 [![ISO 42001](https://img.shields.io/badge/ISO-42001-blue.svg)](docs/compliance/iso42001_compliance.md)
 
