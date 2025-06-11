@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/github/license/australmetrics/agricultural-zoning-ml)](https://github.com/australmetrics/agricultural-zoning-ml/blob/main/LICENSE) 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/australmetrics/agricultural-zoning-ml/validate-manifest.yml)](https://github.com/australmetrics/agricultural-zoning-ml/actions/workflows/validate-manifest.yml)
 [![Codecov](https://img.shields.io/codecov/c/github/australmetrics/agricultural-zoning-ml?logo=codecov)](https://codecov.io/gh/australmetrics/agricultural-zoning-ml)
-[![ISO 42001 Quality Check](https://img.shields.io/badge/ISO-42001-compliant-brightgreen)](https://australmetrics.cl/compliance/iso42001)
+[![ISO 42001](https://img.shields.io/badge/ISO-42001-blue.svg)](docs/compliance/iso42001_compliance.md)
 
 
 ## Overview
