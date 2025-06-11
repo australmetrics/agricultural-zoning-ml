@@ -1,37 +1,60 @@
 ---
 title: Basic Usage
 nav_order: 6
----
+-------------
+
 # Basic Usage
 
-This guide expands on **Simple Usage** by showing additional CLI flags, configuration file support, environment‐variable overrides, and richer Python‐API options. We assume you have Pascal Zoning ML installed (either via `pip install -e .` or from PyPI) and a working GeoTIFF or precomputed index arrays.
+<!-- TOC -->
+
+## Table of Contents
+
+1. [Environment Variables & Configuration File](#environment-variables--configuration-file)
+2. [Command-Line Interface (CLI) Examples](#command-line-interface-cli-examples)
+3. [Saving Intermediate Artifacts](#saving-intermediate-artifacts)
+4. [Python API Examples](#python-api-examples)
+5. [Common Advanced Options](#common-advanced-options)
+6. [Input/Output Manifest](#inputoutput-manifest)
+7. [System & Model Validation](#system--model-validation)
+8. [Summary](#summary)
 
 ---
 
-## 1. Environment Variables & Config File
+## 1. Environment Variables & Configuration File
 
-Pascal Zoning ML can read default settings from environment variables or a `config.yaml` file. CLI flags override configuration entries, and configuration entries override environment variables.
+Pascal Zoning ML supports default settings via environment variables and an optional `config.yaml`. The precedence order is:
+
+1. **CLI flags**
+2. **Configuration file**
+3. **Environment variables**
 
 ### 1.1 Environment Variables
 
-You can set these in your shell before invoking the CLI or Python API. For example:
+Set these in your shell before running the CLI or Python API:
 
 ```bash
-# Set default logging level
+# Default logging level (DEBUG, INFO, WARNING, ERROR)
 export ZONING_LOG_LEVEL="DEBUG"
 
-# Set a default output directory (if you omit --output-dir in the CLI)
+# Default output directory (if --output-dir is omitted)
 export ZONING_OUTPUT_DIR="/path/to/outputs"
 
-# Limit RAM used (if supported by your environment)
+# Maximum memory in GB
 export ZONING_MAX_MEMORY_GB="16"
-```
 
-Pascal Zoning ML will pick up these environment variables automatically at runtime (via Typer and internal logic).
+# Enable ISO 42001 audit logging (JSON audit trail)
+export ZONING_AUDIT_LOGGING="true"
+
+# Embed software version in audit entries
+export ZONING_SOFTWARE_VERSION="1.0.2"
+
+# Enforce secure output permissions
+export ZONING_SECURE_OUTPUT="true"
+```
 
 ### 1.2 config.yaml
 
-Create a file named `config.yaml` in your project root with the following structure:
+Create `config.yaml` in your project root with this structure:
 
 ```yaml
 zoning:
@@ -40,31 +63,28 @@ zoning:
   max_zones: 8
   use_pca: true
 
-clustering:
-  # (These are advanced parameters if exposed later)
-  n_init: 10
-  max_iter: 300
-
 sampling:
   points_per_zone: 5
   min_distance_m: 10.0
 
-io:
-  # These sections are purely illustrative; currently only CLI flags matter
+i/o:
   default_output_dir: "./outputs/from_config"
 ```
 
-When you run the CLI with `--config config.yaml`, Pascal Zoning ML will read these defaults and then apply any CLI overrides you supply.
+Invoke the CLI with the `--config` flag to apply these defaults:
 
-## 2. Command‐Line Interface (CLI) Examples
+```bash
+python -m pascal_zoning.pipeline run \
+  --config config.yaml \
+  --raster ./inputs/field_clip.tif \
+  --indices NDVI,NDRE
+```
 
-### 2.1 Using a config file + overriding flags
+---
 
-Suppose you have:
-- `config.yaml` as shown above
-- A GeoTIFF at `./inputs/field_clip.tif` (EPSG:32719, 5 bands: SWIR, NIR, RED_EDGE, RED, GREEN)
+## 2. Command-Line Interface (CLI) Examples
 
-Run:
+### 2.1 Using config.yaml with flags and validation overrides
 
 ```bash
 python -m pascal_zoning.pipeline run \
@@ -72,111 +92,87 @@ python -m pascal_zoning.pipeline run \
   --raster ./inputs/field_clip.tif \
   --indices NDVI,NDRE \
   --force-k 4 \
-  --output-dir ./outputs/cli_basic
+  --output-dir ./outputs/cli_basic \
+  --validate-system \
+  --validate-model
 ```
 
-What happens?
+* Loads defaults from `config.yaml`.
+* Overrides indices, forced k, output directory.
+* Runs system and model validation before execution.
 
-**Load defaults from config.yaml:**
-- `random_state = 123`
-- `min_zone_size_ha = 0.2`
-- `max_zones = 8`
-- `use_pca = true`
-- `points_per_zone = 5` (from sampling)
-
-**CLI overrides:**
-- `--indices NDVI,NDRE` (compute only those two indices)
-- `--force-k 4` (force exactly 4 clusters)
-- `--output-dir ./outputs/cli_basic`
-
-Output will go into a timestamped subfolder under `./outputs/cli_basic`.
-
-### 2.2 Specifying only environment variables
-
-If you export:
+### 2.2 Using only environment variables with validation
 
 ```bash
 export ZONING_OUTPUT_DIR="./outputs/env_basic"
 export ZONING_LOG_LEVEL="INFO"
-```
+export ZONING_AUDIT_LOGGING="true"
 
-and then run:
-
-```bash
 python -m pascal_zoning.pipeline run \
   --raster ./inputs/field_clip.tif \
   --indices NDVI,NDWI,NDRE,SI \
-  --max-zones 6
+  --max-zones 6 \
+  --validate-system
 ```
 
-Because `--output-dir` is omitted, Pascal Zoning ML writes to `$ZONING_OUTPUT_DIR/YYYYMMDD_HHMMSS_kAUTO_mz0.5` (default `min_zone_size_ha = 0.5` unless overridden).
+* Uses `$ZONING_OUTPUT_DIR` for outputs.
+* Logging set to INFO.
+* Audit logging enabled.
+* Validates system integrity before clustering.
 
-- Logging will honor INFO level (less verbose than DEBUG).
-- `k` is chosen automatically from 2..6.
+---
 
-### 2.3 Saving intermediate files
+## 3. Saving Intermediate Artifacts
 
-By default, Pascal Zoning ML only writes final outputs into the timestamped folder. To keep intermediate artifacts (such as the raw mask, feature matrix, or raw cluster labels), set the environment variable:
+To preserve intermediate files (mask, feature matrix, raw clusters):
 
 ```bash
 export ZONING_SAVE_INTERMEDIATES="true"
-```
 
-Then run:
-
-```bash
 python -m pascal_zoning.pipeline run \
   --raster ./inputs/field_clip.tif \
   --indices NDVI,NDWI \
-  --output-dir ./outputs/intermediates_example
+  --output-dir ./outputs/intermediates_example \
+  --validate-system
 ```
 
-You will find additional files inside the timestamped folder:
+Inside the timestamped folder, you will find:
 
 ```
-YYYYMMDD_HHMMSS_kAUTO_mz0.5/
+<timestamped_folder>/
 ├── intermediate/
 │   ├── valid_mask.npy
 │   ├── feature_matrix.npy
 │   ├── cluster_labels.npy
-│   └── zones_raw.geojson
+│   └── raw_zones.geojson
 ├── zonificacion_agricola.gpkg
 ├── puntos_muestreo.gpkg
-... (rest of final outputs) ...
+... (final outputs) ...
 ```
 
-*(Note: Pascal Zoning ML may require implementation of `save_intermediates()`—check future versions.)*
+---
 
-## 3. Python API Examples
-
-### 3.1 Custom sampling strategy
-
-By default, `points_per_zone` is fixed. You can override it per‐zone or apply a minimum distance constraint:
+## 4. Python API Examples
 
 ```python
 from pathlib import Path
 import numpy as np
 import geopandas as gpd
-from pascal_zoning.zoning import AgriculturalZoning, ZoningResult, ClusterMetrics, ZoneStats
+from pascal_zoning.zoning import AgriculturalZoning
 
-# Pre‐computed indices (e.g., 100×100 arrays)
-ndvi = np.load("data/ndvi.npy")
-ndwi = np.load("data/ndwi.npy")
-ndre = np.load("data/ndre.npy")
-si   = np.load("data/si.npy")
-
-indices = {
-    "NDVI": ndvi,
-    "NDWI": ndwi,
-    "NDRE": ndre,
-    "SI": si
+# Load precomputed index arrays
+datasets = {
+    "NDVI": np.load("data/ndvi.npy"),
+    "NDWI": np.load("data/ndwi.npy"),
+    "NDRE": np.load("data/ndre.npy"),
+    "SI":   np.load("data/si.npy")
 }
 
-# Load a boundary from GeoPackage
-field_gdf = gpd.read_file("data/field_boundary.gpkg")
-bounds_polygon = field_gdf.geometry.iloc[0]
+# Load field boundary
+gdf = gpd.read_file("data/field_boundary.gpkg")
+boundary = gdf.geometry.iloc[0]
 
-# Instantiate engine with PCA enabled and a custom random_state
+# Instantiate the engine with PCA and a fixed seed
 zoning = AgriculturalZoning(
     random_state=2023,
     min_zone_size_ha=0.1,
@@ -184,76 +180,35 @@ zoning = AgriculturalZoning(
     output_dir=Path("outputs/api_basic")
 )
 
-# Run, but change points_per_zone to 10, enable PCA, and let k be automatic
-result: ZoningResult = zoning.run_pipeline(
-    indices=indices,
-    bounds=bounds_polygon,
+# Run with custom sampling, PCA, and validation
+result = zoning.run_pipeline(
+    indices=datasets,
+    bounds=boundary,
     points_per_zone=10,
     crs="EPSG:32719",
-    force_k=None,     # auto‐select k
-    use_pca=True      # turn on PCA
+    use_pca=True,
+    validate_system=True,
+    validate_model=True
 )
 
-# Post‐process: filter out any sample points that lie too close (< 5 m) to each other
-samples_gdf = result.samples.copy()
-samples_gdf = samples_gdf[samples_gdf.geometry.apply(lambda p: p.distance(p) >= 5.0)]
-
-# Print summary
-print(f"Chosen k = {result.metrics.n_clusters}")
-print(f"Zone areas (ha): {[s.area_ha for s in result.stats]}")
+print(f"Selected k: {result.metrics.n_clusters}")
 ```
 
-### 3.2 Programmatic Configuration
+---
 
-Rather than using environment variables or CLI flags, you can programmatically assign default parameters:
+## 5. Common Advanced Options
 
-```python
-from pascal_zoning.config import ZoningConfig
-from pascal_zoning.zoning import AgriculturalZoning
-
-# Create a config object (matching config.yaml schema)
-app_config = ZoningConfig(
-    zoning={
-        "random_state": 555,
-        "min_zone_size_ha": 0.3,
-        "max_zones": 6,
-        "use_pca": False
-    },
-    sampling={
-        "points_per_zone": 8,
-        "min_distance_m": None
-    }
-)
-
-# Instantiate using the config directly
-zoning = AgriculturalZoning.from_config(app_config)
-# (Assumes `from_config` static method reads the dictionary and sets attributes)
-
-# Proceed as normal with zoning.run_pipeline(...)
-```
-
-*(Note: The `ZoningConfig` class and `.from_config()` method may require you to implement them or consult the `config.py` file.)*
-
-## 4. Common Advanced Options
-
-### 4.1 Changing PCA variance ratio
-
-By default, PCA retains 95% of variance. To adjust:
+### 5.1 Adjusting PCA variance
 
 ```bash
 python -m pascal_zoning.pipeline run \
   --raster ./inputs/field_clip.tif \
   --indices NDVI,NDWI,NDRE,SI \
-  --output-dir ./outputs/basic_pca \
-  --use-pca \
-  --pca-variance 0.90
+  --pca-variance 0.90 \
+  --validate-model
 ```
 
-*(Note: The `--pca-variance` flag must be implemented in `pipeline.py` to override `PCA(n_components=variance)`. If not yet available, you can modify `zoning.pca` manually in code.)*
-
-### 4.2 Logging to a file
-
-To save logs to disk (ISO 42001 traceability):
+### 5.2 Logging to a file with secure output
 
 ```bash
 python -m pascal_zoning.pipeline run \
@@ -263,62 +218,58 @@ python -m pascal_zoning.pipeline run \
   --log-file ./outputs/logging_example/run.log
 ```
 
-This assumes the CLI supports `--log-file <path>` to write Loguru output. Otherwise, set:
+Combine with:
 
 ```bash
-export ZONING_LOG_FILE="./outputs/logging_example/run.log"
+export ZONING_SECURE_OUTPUT="true"
 ```
 
-and Pascal Zoning ML will detect and write to that file.
+---
 
-## 5. Input/Output Tracking
+## 6. Input/Output Manifest
 
-When you run a "basic" or "advanced" example, Pascal Zoning ML will generate a JSON "manifest" of inputs and outputs for auditing. The default filename is `manifest_zoning.json` within the timestamped folder:
+Pascal Zoning ML will generate a JSON manifest (`manifest_zoning.json`) inside the run folder, containing:
+
+* **Inputs**: raster path, indices list, parameters.
+* **Outputs**: file names and paths.
+* **Metadata**: timestamp, software\_version, processing time.
+* **Audit**: flags indicating which validations ran.
+
+Example schema:
 
 ```json
 {
   "name": "pascal-zoning-ml",
-  "version": "0.1.0",
+  "version": "1.0.2",
   "timestamp": "2025-06-04T15:23:10Z",
-  "interfaces": {
-    "input": {
-      "raster": "./inputs/field_clip.tif",
-      "indices": ["NDVI", "NDRE"]
-    },
-    "output": {
-      "geopackages": {
-        "zonificacion_agricola": "zonificacion_agricola.gpkg",
-        "puntos_muestreo": "puntos_muestreo.gpkg"
-      },
-      "csv": "estadisticas_zonas.csv",
-      "json": "metricas_clustering.json",
-      "png": {
-        "mapa_ndvi": "mapa_ndvi.png",
-        "mapa_clusters": "mapa_clusters.png",
-        "zonificacion_results": "zonificacion_results.png"
-      },
-      "log": "pipeline_run.log"
-    }
-  },
-  "metadata": {
-    "processing_time": 12.345,
-    "software_version": "0.1.0"
+  "software_version": "1.0.2",
+  "interfaces": { ... },
+  "metadata": { ... },
+  "audit": {
+    "validated_system": true,
+    "validated_model": true
   }
 }
 ```
 
-Use this manifest to provide ISO 42001–compliant traceability:
-- Timestamps
-- Parameter lists
-- Exact file paths
+---
 
-## 6. Summary
+## 7. System & Model Validation
 
-- **Simple Usage** is best for first‐time runs.
-- **Basic Usage** introduces configuration files, environment variables, and more CLI flags.
-- **Advanced Usage** (see `advanced_examples.md`) covers multi‐field batch runs, custom cluster metrics export, and integration with downstream analytics.
+Always include validation steps to ensure ISO 42001 compliance:
 
-For additional details on coding patterns, configuration conventions, and ISO 42001 traceability, consult the following:
-- `advanced_examples.md`
-- `iso42001_compliance.md`
-- `normative_dependencies.md`
+```bash
+# System integrity checks (dependencies, config)
+python -m pascal_zoning.pipeline --validate-system
+
+# Model consistency checks (schema, weights)
+python -m pascal_zoning.pipeline --validate-model
+```
+
+These commands perform input/output schema validation, dependency verification, and model artifact consistency checks.
+
+---
+
+## 8. Summary
+
+This guide extends basic usage by adding ISO 42001–compliant audit and validation controls, secure output enforcement, and updated manifest contents. It ensures end-to-end traceability and system integrity for all runs. For full advanced examples, see `advanced_examples.md`.

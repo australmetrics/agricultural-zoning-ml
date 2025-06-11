@@ -1,597 +1,250 @@
 ---
 title: Architecture Overview
 nav_order: 5
+-------------
+
+# 1. Introduction
+
+This document provides a structured and professional overview of the **Pascal Zoning ML** system architecture, aligned with the requirements of the **ISO/IEC 42001:2023** standard. It includes design details, governance compliance, traceability, quality, and scalability considerations.
+
+# 2. ISO 42001 Compliance
+
+To ensure ISO 42001 compliance, the system implements:
+
+* **Full traceability**: All operations are recorded with metadata (user, timestamp, version).
+* **Strict validation**: Inputs and outputs are checked against defined schemas and value ranges.
+* **Reproducibility**: All configurations and dependencies are versioned and stored.
+* **Version control**: Critical dependencies are locked and hashed.
+* **Assertive documentation**: Up-to-date user guides, API references, and design decisions.
+* **Automated testing**: Unit and integration test coverage > 85%.
+* **Data governance**: Clearly defined roles (Data Steward, Data Owner), quality oversight, metadata management, and access policies.
+* **Privacy and consent policies**: Handling of sensitive data according to local/international regulations, consent recording, role-based access, and encryption of critical data.
+
+# 3. Component Overview
+
+## 3. Visual Architecture (ASCII)
+
+```ascii
+┌────────────────────┐
+│  User Interface    │
+│ (CLI / Python API) │
+└────────┬───────────┘
+         ↓
+┌────────────────────────────┐
+│     Main Controller        │
+│ (ProcessingController)     │
+└────────┬───────────┬───────┘
+         ↓           ↓
+ ┌────────────┐     ┌──────────────┐
+ │ Tabular    │     │ Image        │
+ │ Features   │     │ Features     │
+ └────┬───────┘     └─────┬────────┘
+      ↓                   ↓
+ ┌────────────────────────────┐
+ │        ML Fusion           │
+ └────────────┬────────────── ┘
+              ↓
+      ┌────────────── ┐
+      │  Clustering   │
+      └────┬──────────┘
+           ↓
+ ┌────────────────┐     ┌────────────────┐
+ │ GeoSampling    │     │ Export         │
+ └────────────────┘     └────────────────┘
+        ↓                      ↓
+  GeoPackage              JSON, CSV, PNG
+```
+
+## 3.1 Interface Layer
+
+* **CLI (Typer)**: Integrated access and help, argument validation, OAuth2/API Key support, token management.
+* **Python API**: REST endpoints with type hints, Sphinx documentation, versioned routes (/v1, /v2), and user-specific rate limiting.
+
+## 3.2 Orchestration Layer
+
+* **ProcessingController** (Command Pattern): Routes commands, handles aggregation and exceptions.
+* **Auditing mechanism**: Observer-based progress tracking and logs.
+
+## 3.3 Processing Layer
+
+* **Training & Optimization Pipeline**: Clustering parameters can be tuned via grid search or Bayesian optimization (optional). The system currently uses heuristics based on Silhouette and Calinski-Harabasz by default.
+
+* **Model Lineage Tracking**: Each clustering model run logs the exact dataset hash, preprocessing config, and output statistics. Lineage is tracked with UUIDs linking input, config, and results.
+
+## 3.4 Data Layer
+
+* **I/O**: GDAL/Rasterio for raster, GeoPandas/Shapely for vector.
+* **Temporary storage**: Memory-mapped with disk fallback.
+* **Output formats**: GeoPackage, CSV, JSON, PNG.
+
+## 3.5 Infrastructure Layer
+
+* **Logging (Loguru)**: Structured JSON, configurable rotation, SHA-256 checksums.
+* **Configuration (PyYAML + Env)**: Hierarchical values with validation via *pydantic*.
+* **Dependency management**: `requirements.txt` with hashes, `pip-compile` enforced.
+
+# 4. Data Flow
+
+* **Data quality validation**: Detect missing values, outliers, duplicates; automated correction and alerting.
+
+| Step                  | Description                                      |
+| --------------------- | ------------------------------------------------ |
+| 1. Input validation   | Format, range, CRS, and schema checks            |
+| 2. Mask creation      | Thresholding and polygon-based clipping          |
+| 3. Feature extraction | Patch-based/sliding-window spectral traits       |
+| 4. Index calculation  | Single-pass vectorized index derivation          |
+| 5. Clustering         | Training and selection of optimal configuration  |
+| 6. Zoning polygons    | Vectorization and spatial statistics computation |
+| 7. Sample generation  | Controlled spatial distribution                  |
+| 8. Output generation  | File export and traceable logging                |
+
+# 5. Error Management
+
+* **CLI/API Feedback Handling**: The CLI returns clear error codes with remediation tips; API responses include structured JSON messages and all exceptions are traceable in logs with full context and traceback.
+* **Exception hierarchy** defined in `errors.py`:
+
+```python
+class ZonificationError(Exception): ...
+class ValidationError(ZonificationError): ...
+class ProcessingError(ZonificationError): ...
+class AuthenticationError(ZonificationError): ...
+class AuthorizationError(ZonificationError): ...
+class RateLimitError(ZonificationError): ...
+class NotFoundError(ZonificationError): ...
+class ConflictError(ZonificationError): ...
+```
+
+* **Standardized HTTP Error Codes (REST API)**:
+
+| HTTP Code | Error Type          | Meaning                                            |
+| --------- | ------------------- | -------------------------------------------------- |
+| 400       | ValidationError     | Invalid input (missing fields, wrong format/range) |
+| 401       | AuthenticationError | Invalid or expired token                           |
+| 403       | AuthorizationError  | Access denied (insufficient privileges)            |
+| 404       | NotFoundError       | Missing resource (field, raster, etc.)             |
+| 409       | ConflictError       | Inconsistent versioning or duplicate operation     |
+| 429       | RateLimitError      | Rate limit exceeded, apply backoff                 |
+| 500       | ProcessingError     | Internal system or algorithmic failure             |
+
+* **Error Response Format (JSON)**:
+
+```json
+{
+  "error_code": "ValidationError",
+  "http_status": 400,
+  "message": "Detailed technical explanation and resolution tip",
+  "timestamp": "2025-06-11T09:00:00Z",
+  "request_id": "uuid-v4"
+}
+```
+
+# 6. Testing and Quality Assurance
+
+* **Unit tests**: `pytest` with mocks and fixtures.
+* **Integration tests**: E2E workflows with real data.
+* **Benchmarking**: Execution time and memory profiling.
+* **CI/CD**: GitHub Actions for automated tests, linting (`flake8`, `mypy`), and documentation builds.
+
+# 7. Extensibility
+
+* Subclass `AgriculturalZoning` for new clustering methods.
+* Add custom vegetation index modules.
+* Export plugins via entrypoints.
+* Adaptive sampling modules without core changes.
+
+# 8. Deployment & Scalability
+
+* **Docker containers**: Lightweight, multi-stage builds.
+* **Kubernetes (future)**: Distributed orchestration.
+* **Cloud storage**: Optional S3/Azure Blob integration.
+
+# 9. Security & Compliance
+
+* Path validation to prevent traversal.
+* Dependency scanning via Snyk (or equivalent).
+* Encrypted communication for API integrations.
+
+# 10. Monitoring & Observability
+
+* Prometheus/Grafana metrics.
+* Centralized logs via ELK Stack.
+* Alerting on failure and performance degradation.
+
+# 11. Maintenance
+
+* Quarterly dependency updates.
+* Refactoring guided by test coverage.
+* Configurable result backup retention.
+
+# 12. Integration Points
+
+* GIS software: QGIS, ArcGIS.
+* ETL pipelines.
+* RESTful connectors and OAuth2 support.
+
+See Section 5 for error handling schemas returned by both CLI and Python API modules.
+
+# 13. Impact Assessment and Risk Controls
+
+* Periodic assessment of model output sensitivity and impact on farming decisions.
+* Identification of vulnerable stakeholders and design of mitigation strategies.
+* Evaluation of unintended consequences (e.g., over-segmentation, misclassification).
+* Human-in-the-loop verification checkpoints.
+
+## 14. Model Version Traceability
+
+* Internal model versions (e.g., Clustering v2.1, FusionModule v1.3) are logged per run.
+* All configurations and model states are hashed (SHA-256) and stored in audit logs.
+* Semantic versioning (MAJOR.MINOR.PATCH) is followed for API and model modules. Any backward-incompatible change triggers a major version update and is communicated in the changelog.- Internal model versions (e.g., Clustering v2.1, FusionModule v1.3) are logged per run.
+* All configurations and model states are hashed (SHA-256) and stored in audit logs.
+
+## 15. Data Provenance
+
+* All input sources (satellite, drone, agronomic data) are logged with acquisition date, CRS, resolution, license, and checksum.
+* Licenses and usage policies are validated and version-controlled.
+* Input files are versioned using content hashes and optionally tracked using DVC or Git LFS to ensure reproducibility.- All input sources (satellite, drone, agronomic data) are logged with acquisition date, CRS, resolution, license, and checksum.
+* Licenses and usage policies are validated and version-controlled.
+
+## 16. Algorithm Governance
+
+* Annual review of core algorithms by internal/external reviewers.
+* Validation committee includes agronomists and ML engineers.
+* Design decisions and changes are versioned and audit-logged.
+
+## 17. Stakeholder Feedback Loop
+
+* Feedback mechanism embedded in CLI/API to report inconsistencies.
+* Feedback tagged, stored, and optionally linked to model retraining cycles.
+* Review cycles scheduled quarterly.
+
+## 18. Role-Based Access Control (RBAC)
+
+* Permissions defined for Operators, Analysts, and Auditors.
+* All actions logged with user role, session ID, and timestamp.
+* RBAC enforced at API, CLI, and data-access levels.
+
+## 19. Business Continuity & Failover Strategy
+
+* Critical zones and models are backed up daily with automated retention policies.
+* If a processing task fails, a retry queue is triggered with exponential backoff.
+* Export failures fall back to safe temporary storage and alert the user.
+* Recovery time objective (RTO): < 6 hours; recovery point objective (RPO): < 1 day.
+
+## 20. ISO 42001 Coverage Map
+
+| ISO 42001 Requirement                 | Covered Section(s) |
+| ------------------------------------- | ------------------ |
+| Governance and Risk Management        | 2, 13, 16          |
+| Traceability and Reproducibility      | 2, 14, 15          |
+| Algorithmic Impact Assessment         | 13                 |
+| Data Provenance and Quality           | 4, 15              |
+| Role-Based Access Control (RBAC)      | 18                 |
+| Logging and Monitoring                | 5, 10              |
+| Security and Compliance Controls      | 9, 19              |
+| Stakeholder Feedback                  | 17                 |
+| Failover and Business Continuity      | 19                 |
+| Version Control and Change Management | 14, 11             |
+
 ---
 
-# Visión General de la Arquitectura
-
-Este documento proporciona una visión general de alto nivel de la arquitectura del sistema Pascal Zoning ML.
-
-## 1. Estruresult = zoning.run_pipeline(
-    indices=indices_dict,
-    bounds=field_polygon,
-    points_per_zone=5,
-    crs="EPSG:32719"
-)
-
-## 6. Dependencias Principales
-
-- **Científicas**:
-  - numpy: operaciones con arrays
-  - scikit-learn: clustering y métricas
-  - pandas: manipulación de datos tabulares
-
-- **Geoespaciales**:
-  - geopandas: operaciones vectoriales
-  - rasterio: operaciones raster
-  - shapely: geometrías
-
-- **Visualización**:
-  - matplotlib: generación de figuras
-
-- **Utilidades**:
-  - typer: CLI
-  - loguru: logging
-  - pyyaml: configuración
-
-## 7. Consideraciones ISO 42001
-
-El sistema implementa:
-
-- Trazabilidad completa de operaciones
-- Validación de entradas y salidas
-- Reproducibilidad de resultados
-- Control de versiones de dependencias
-- Documentación exhaustiva
-- Tests automatizados
-
-## 8. Extensibilidad
-
-El sistema puede extenderse mediante:
-
-1. Subclasificación de `AgriculturalZoning`
-2. Implementación de nuevas métricas de clustering
-3. Personalización de estrategias de muestreo
-4. Adición de nuevos formatos de exportación
-5. Integración con otros sistemas del Proyecto
-
-```
-agricultural-zoning-ml/
-├── src/
-│   └── pascal_zoning/
-│       ├── __init__.py
-│       ├── zoning.py          # Motor principal de zonificación  
-│       ├── pipeline.py        # CLI basado en Typer
-│       ├── config.py          # Cargador de configuración
-│       ├── logging_config.py  # Configuración de Loguru
-│       ├── interface.py       # Definiciones de tipos
-│       └── viz.py            # Funciones de visualización
-## 2. Componentes Principales
-
-### 2.1 Motor de Zonificación (`zoning.py`)
-
-El núcleo del sistema implementado en la clase `AgriculturalZoning`. Responsable de:
-
-1. Creación de máscaras a partir de índices espectrales
-2. Preparación de matrices de características 
-3. Clustering con K-Means
-4. Extracción de polígonos de zonas 
-5. Generación de puntos de muestreo
-6. Cálculo de estadísticas por zona
-7. Exportación de resultados
-8. Visualización de resultados
-
-### 2.2 Interfaz de Línea de Comandos (`pipeline.py`)
-
-Implementa el CLI usando Typer, permitiendo:
-
-- Ejecución del pipeline completo
-- Configuración de parámetros via argumentos
-- Integración con flujos de trabajo automatizados
-- Logging estructurado
-
-### 2.3 Gestión de Configuración (`config.py`)
-
-Maneja la configuración del sistema a través de:
-
-- Archivos YAML
-- Variables de entorno
-- Validación de parámetros
-- Valores por defecto
-
-### 2.4 Logging y Trazabilidad (`logging_config.py`)
-
-Configura el sistema de logging usando Loguru para:
-
-- Mensajes formateados con timestamp
-- Niveles de log configurables
-- Salida a consola y archivo
-- Trazabilidad para ISO 42001
-
-### 2.5 Interfaces y Tipos (`interface.py`)
-
-Define las estructuras de datos centrales:
-
-```python
-@dataclass
-class ClusterMetrics:
-    n_clusters: int
-    silhouette: float
-    calinski_harabasz: float
-    inertia: float
-    cluster_sizes: Dict[int, int]
-    timestamp: str
-
-@dataclass
-class ZoneStats:
-    zone_id: int
-    area_ha: float
-    perimeter_m: float
-    compactness: float
-    mean_values: Dict[str, float]
-    std_values: Dict[str, float]
-
-@dataclass
-class ZoningResult:
-    zones: gpd.GeoDataFrame
-    samples: gpd.GeoDataFrame
-    metrics: ClusterMetrics
-    stats: List[ZoneStats]
-```
-
-### 2.6 Visualización (`viz.py`)
-
-Proporciona funciones para generar:
-
-- Mapas de índices espectrales
-- Mapas de clusters
-- Gráficos de barras de áreas
-- Figuras de resumen
-
-## 3. Flujo de Datos
-
-1. **Entrada**:
-   - Índices espectrales (arrays NumPy 2D)
-   - Polígono del campo (Shapely)
-   - Parámetros de configuración
-
-2. **Procesamiento**:
-   - Validación de entradas
-   - Creación de máscara
-   - Preprocesamiento de características
-   - Clustering
-   - Extracción de geometrías
-   - Cálculo de estadísticas
-
-3. **Salida**:
-   - GeoPackage: zonas y puntos de muestreo
-   - CSV: estadísticas por zona
-   - JSON: métricas de clustering
-   - PNG: visualizaciones
-
-## 4. Manejo de Errores
-
-Jerarquía de excepciones:
-
-```python
-class ZonificationError(Exception):
-    """Excepción base para errores de zonificación."""
-    pass
-
-class ValidationError(ZonificationError):
-    """Error de validación de entradas."""
-    pass
-
-class ProcessingError(ZonificationError):
-    """Error durante el procesamiento."""
-    pass
-```
-
-## 5. Integración
-
-### 5.1 Uso vía CLI
-
-```bash
-python -m pascal_zoning.pipeline run \
-  --raster ./inputs/field.tif \
-  --indices NDVI,NDWI,NDRE,SI \
-  --output-dir ./outputs \
-  --force-k 3 \
-  --min-zone-size 0.5
-```
-
-### 5.2 Uso vía API
-
-```python
-from pascal_zoning.zoning import AgriculturalZoning
-
-zoning = AgriculturalZoning(
-    random_state=42,
-    min_zone_size_ha=0.5,
-    max_zones=5
-)
-
-result = zoning.run_pipeline(
-    indices=indices_dict,
-    bounds=field_polygon,
-    points_per_zone=5,
-    crs="EPSG:32719"
-)
-├─────────────────────────────────────────────────────────────┤
-│  Main Controller (src.main)                                │
-│  • Process coordination                                     │
-│  • Error handling                                          │
-│  • Result aggregation                                      │
-└─────────────────────────────────────────────────────────────┘
-                                    │
-┌─────────────────────────────────────────────────────────────┐
-│                   Processing Layer                          │
-├─────────────────┬─────────────────┬─────────────────────────┤
-│  Preprocessor   │    Indices      │    Validation           │
-│  • Clipping     │    • NDVI       │    • Input checks       │
-│  • Resampling   │    • NDRE       │    • Format validation  │
-│  • Validation   │    • SAVI       │    • CRS verification   │
-└─────────────────┴─────────────────┴─────────────────────────┘
-                                    │
-┌─────────────────────────────────────────────────────────────┐
-│                      Data Layer                             │
-├─────────────────┬─────────────────┬─────────────────────────┤
-│  Input Data     │   Temporary     │    Output Data          │
-│  • Satellite    │   Processing    │    • Indices (GeoTIFF)  │
-│    imagery      │   • Memory      │    • Metadata (JSON)    │
-│  • Vector data  │   • Disk cache  │    • Logs (Text)        │
-└─────────────────┴─────────────────┴─────────────────────────┘
-                                    │
-┌─────────────────────────────────────────────────────────────┐
-│                   Infrastructure Layer                      │
-├─────────────────────────────────────────────────────────────┤
-│  Logging (Loguru)  │  File I/O (Rasterio)  │  Config Mgmt   │
-│  • Audit trails    │  • Geospatial data    │  • Environment  │
-│  • Error tracking  │  • Format support     │  • Parameters   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Component Architecture
-
-### 1. User Interface Layer
-
-#### CLI Interface (`typer` framework)
-- **Purpose**: Provides command-line access to all functionality
-- **Commands**: `indices`, `clip`, `auto`
-- **Features**: 
-  - Parameter validation
-  - Help system
-  - Progress indicators
-  - Error reporting
-
-#### Direct API Access
-- **Purpose**: Programmatic access for integration
-- **Interface**: Python function calls
-- **Features**:
-  - Type hints
-  - Comprehensive documentation
-  - Consistent return formats
-
-### 2. Orchestration Layer
-
-#### Main Controller (`src.main`)
-
-```python
-class ProcessingController:
-    """
-    Central coordinator for all processing operations.
-    Implements command pattern for operation management.
-    """
-    
-    def __init__(self):
-        self.logger = self._setup_logging()
-        self.config = self._load_configuration()
-    
-    def execute_command(self, command: str, **kwargs) -> Dict[str, Any]:
-        """Execute processing command with full audit trail."""
-        pass
-```
-
-**Responsibilities**:
-- Command routing and execution
-- Error handling and recovery
-- Result aggregation
-- Audit logging
-- Resource management
-
-**Design Patterns**:
-- **Command Pattern**: For operation encapsulation
-- **Chain of Responsibility**: For error handling
-- **Observer Pattern**: For progress reporting
-
-### 3. Processing Layer
-
-#### Preprocessor Module (`src.preprocessor`)
-
-```python
-class ImagePreprocessor:
-    """
-    Handles all image preprocessing operations.
-    Follows single responsibility principle.
-    """
-    
-    @staticmethod
-    def validate_input(image_path: str) -> ValidationResult:
-        """Validate input image format and accessibility."""
-        pass
-    
-    @staticmethod
-    def clip_image(image_path: str, vector_path: str) -> str:
-        """Clip image using vector geometry."""
-        pass
-```
-
-**Architecture**:
-- **Static Methods**: Stateless operations for thread safety
-- **Validation Pipeline**: Multi-step input verification
-- **Error Propagation**: Structured error reporting
-
-#### Indices Module (`src.indices`)
-
-```python
-class VegetationIndices:
-    """
-    Calculates vegetation indices with automatic band detection.
-    Optimized for memory efficiency and processing speed.
-    """
-    
-    def __init__(self, image_metadata: Dict):
-        self.bands = self._detect_bands(image_metadata)
-        self.nodata_value = self._get_nodata_value(image_metadata)
-    
-    def calculate_all_indices(self) -> Dict[str, numpy.ndarray]:
-        """Calculate NDVI, NDRE, and SAVI in single pass."""
-        pass
-```
-
-**Architecture**:
-- **Factory Pattern**: For index calculation strategy selection
-- **Template Method**: For common calculation workflow
-- **Strategy Pattern**: For different satellite sensor support
-
-### 4. Data Layer Architecture
-
-#### Data Flow Pattern
-
-```
-Input Validation → Memory Loading → Processing → Output Writing → Cleanup
-      ↓                 ↓              ↓            ↓           ↓
-   Checksums     →   Chunking    →  Parallel   →  Atomic   →  Resource
-   Format check     Memory mgmt     Processing     Write      Release
-```
-
-#### Storage Strategy
-
-**Input Data Management**:
-- Read-only access patterns
-- Memory-mapped files for large imagery
-- Lazy loading for efficiency
-
-**Temporary Processing**:
-- Memory-first approach with disk fallback
-- Automatic cleanup on completion/error
-- Chunk-based processing for large datasets
-
-**Output Data Management**:
-- Atomic write operations
-- Metadata preservation
-- Backup creation for critical results
-
-### 5. Infrastructure Layer
-
-#### Logging Architecture (`loguru`)
-
-```python
-class AuditLogger:
-    """
-    ISO 42001 compliant logging system.
-    Provides full audit trail for all operations.
-    """
-    
-    def __init__(self):
-        self.logger = self._configure_loguru()
-        self.session_id = self._generate_session_id()
-    
-    def log_operation(self, operation: str, inputs: Dict, 
-                     outputs: Dict, duration: float):
-        """Log operation with full context."""
-        pass
-```
-
-**Features**:
-- **Structured Logging**: JSON-formatted entries
-- **Automatic Rotation**: Size and time-based rotation
-- **Integrity Protection**: SHA-256 checksums
-- **Backup Management**: Automated backup creation
-
-#### Configuration Management
-
-```python
-class ConfigurationManager:
-    """
-    Centralized configuration management.
-    Environment-aware with validation.
-    """
-    
-    def __init__(self):
-        self.config = self._load_from_env()
-        self._validate_configuration()
-    
-    def get(self, key: str, default: Any = None) -> Any:
-        """Get configuration value with fallback."""
-        pass
-```
-
-## Design Principles
-
-### 1. Single Responsibility Principle
-Each module has a clear, single purpose:
-- `main.py`: Orchestration only
-- `indices.py`: Index calculations only
-- `preprocessor.py`: Image preprocessing only
-
-### 2. Dependency Inversion
-High-level modules don't depend on low-level modules:
-- Abstract interfaces for external dependencies
-- Dependency injection for testing
-- Configuration-driven behavior
-
-### 3. Open/Closed Principle
-System is open for extension, closed for modification:
-- Plugin architecture for new indices
-- Strategy pattern for different sensors
-- Configuration-based feature flags
-
-### 4. Interface Segregation
-Clients depend only on interfaces they use:
-- Minimal public APIs
-- Role-based interfaces
-- Clear separation of concerns
-
-## Quality Assurance Architecture
-
-### Testing Strategy
-
-**Unit Testing**:
-```python
-class TestIndicesModule:
-    """Comprehensive unit tests for indices calculation."""
-    
-    def test_ndvi_calculation_accuracy(self):
-        """Test NDVI calculation against known values."""
-        pass
-    
-    def test_band_detection_sentinel2(self):
-        """Test automatic band detection for Sentinel-2."""
-        pass
-```
-
-**Integration Testing**:
-- End-to-end workflow testing
-- Error condition simulation
-- Performance benchmarking
-
-**Continuous Integration**:
-- Automated testing on every commit
-- Code quality checks (flake8, mypy)
-- Documentation generation
-- Security vulnerability scanning
-
-### Performance Architecture
-
-**Memory Management**:
-- Streaming processing for large files
-- Garbage collection optimization
-- Memory usage monitoring
-
-**Processing Optimization**:
-- NumPy vectorization
-- Parallel processing where applicable
-- Efficient I/O operations
-- Caching strategies
-
-## Security Architecture
-
-### Data Protection
-- Input validation and sanitization
-- Path traversal prevention
-- Temporary file secure handling
-- Output data integrity verification
-
-### Audit and Compliance
-- Complete operation logging
-- User action tracking
-- System state monitoring
-- Compliance report generation
-
-## Deployment Architecture
-
-### Environment Management
-```
-Development → Testing → Staging → Production
-     ↓          ↓         ↓          ↓
-   Local     CI/CD    Pre-prod   Live System
-  Testing   Pipeline   Testing   Monitoring
-```
-
-### Packaging Strategy
-- Virtual environment isolation
-- Dependency pinning
-- Cross-platform compatibility
-- Distribution package creation
-
-## Scalability Considerations
-
-### Current Architecture Limits
-- **Single Machine**: Designed for standalone operation
-- **Memory Bound**: Limited by available system memory
-- **I/O Bound**: Limited by disk read/write speed
-
-### Future Scalability Options
-- **Distributed Processing**: Chunked processing across nodes
-- **Cloud Integration**: S3/Azure Blob storage support
-- **Container Deployment**: Docker containerization
-- **API Service**: REST API for remote access
-
-## Monitoring and Observability
-
-### System Metrics
-- Processing time per operation
-- Memory usage patterns
-- Error rates and types
-- File I/O performance
-
-### Business Metrics
-- Images processed per day
-- Success/failure rates
-- User activity patterns
-- Feature usage statistics
-
-## Maintenance Architecture
-
-### Code Maintenance
-- Automated dependency updates
-- Regular security patches
-- Performance monitoring
-- Refactoring guidelines
-
-### Data Maintenance
-- Log rotation and archival
-- Temporary file cleanup
-- Result data retention
-- Backup verification
-
-## Integration Points
-
-### External System Integration
-- **GIS Software**: QGIS, ArcGIS compatibility
-- **Data Pipelines**: Integration with larger workflows
-- **Cloud Platforms**: AWS, Azure, GCP support
-- **Databases**: Metadata storage options
-
-### API Integration
-- RESTful interface considerations
-- Authentication mechanisms
-- Rate limiting strategies
-- Version management
-
-## Risk Management
-
-### Technical Risks
-- **Data Corruption**: Checksums and validation
-- **Processing Failures**: Robust error handling
-- **Resource Exhaustion**: Memory and disk monitoring
-- **Version Conflicts**: Dependency management
-
-### Mitigation Strategies
-- Comprehensive testing
-- Graceful degradation
-- Automatic recovery
-- Clear error reporting
-
-This architecture supports the ISO 42001 requirements while maintaining simplicity and reliability for end users.
+*This document serves as an ISO 42001-aligned reference for system design, operation, and audit readiness.*

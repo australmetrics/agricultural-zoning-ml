@@ -1,107 +1,113 @@
-# Especificación de Interfaz con PASCAL NDVI Block
+# Pascal Zoning ML — NDVI Integration Interface
 
-## Visión General
+**Version:** main  |  **Owner:** AustralMetrics SpA  |  **ISO 42001 Compliant**
 
-Este documento especifica la interfaz entre el PASCAL NDVI Block y el PASCAL Zoning ML Block, siguiendo las especificaciones ISO 42001 para interoperabilidad entre bloques de software.
+This document describes how to integrate externally computed spectral indices—particularly NDVI—from a dedicated index block into the core Pascal Zoning ML pipeline as implemented in the `agricultural-zoning-ml` repository.
 
-## Estructura de Archivos
+---
 
-### Directorio de Outputs
+## 1. CLI Interface
 
-```
-outputs/
-├── manifest.json       # Metadatos y configuración
-├── ndvi.tif           # Índice NDVI (requerido)
-├── ndre.tif           # Índice NDRE (opcional)
-├── savi.tif           # Índice SAVI (opcional)
-└── {otros}.tif        # Otros índices adicionales
-```
+### 1.1 Inputs
 
-### Manifest Schema
+* **`--raster`** (Path): Path to a clipped multi-band GeoTIFF containing all bands needed for requested indices.
+* **`--indices`** (str): Comma-separated list of indices to compute. Supported: `NDVI`, `NDWI`, `NDRE`, `SI`.
+* **`--output-dir`** (Path): Base directory where a timestamped run folder will be created.
+* **Optional flags**:
 
-El archivo `manifest.json` debe seguir el schema definido en `schemas/ndvi_block_output.schema.json`. Ejemplo:
+  * `--force-k <int>`: Force K‑Means to use exactly `k` clusters.
+  * `--min-zone-size <float>`: Minimum zone area (ha). Default: `0.5`.
+  * `--max-zones <int>`: Maximum clusters to evaluate. Default: `10`.
+  * `--use-pca`: Enable PCA to reduce feature dimensions to 95% variance.
 
-```json
-{
-    "version": "1.0.3",
-    "timestamp": "2025-05-29T10:30:00Z",
-    "input_image": {
-        "path": "/path/to/original.tif",
-        "bands": {
-            "RED": 1,
-            "NIR": 2
-        },
-        "crs": "EPSG:4326",
-        "transform": [0.0001, 0.0, -70.0, 0.0, -0.0001, -33.0]
-    },
-    "indices": {
-        "ndvi": "outputs/ndvi.tif",
-        "ndre": "outputs/ndre.tif",
-        "savi": "outputs/savi.tif"
-    },
-    "metadata": {
-        "processing_time": 12.5,
-        "software_version": "1.0.3"
-    }
-}
+### 1.2 Command Example
+
+```bash
+python -m pascal_zoning.pipeline run \
+  --raster ./inputs/field_clip.tif \
+  --indices NDVI,NDWI,NDRE \
+  --output-dir ./outputs \
+  --force-k 4 \
+  --min-zone-size 0.2 \
+  --max-zones 8 \
+  --use-pca
 ```
 
-## Formatos y Requerimientos
+### 1.3 Run Outputs
 
-### GeoTIFF Índices
+After execution, the pipeline creates a subfolder under `<output-dir>`:
 
-- **Formato**: GeoTIFF
-- **Tipo de Datos**: Float32
-- **Rango de Valores**: [-1.0, 1.0]
-- **NoData**: -9999
-- **Compresión**: LZW (recomendado)
-- **CRS**: Debe coincidir con la imagen original
+```
+<output-dir>/
+└── YYYYMMDD_HHMMSS_k4_mz0.2/
+    ├── zonificacion_agricola.gpkg     # Management zone polygons
+    ├── puntos_muestreo.gpkg           # Sampling points with index attributes
+    ├── mapa_ndvi.png                  # NDVI raster visualization
+    ├── mapa_clusters.png              # Clustered zone map
+    ├── estadisticas_zonas.csv         # Zone statistics table
+    ├── metricas_clustering.json       # Clustering quality metrics
+    └── zonificacion_results.png       # Composite overview figure
+```
 
-### manifest.json
+---
 
-- **Versión**: Debe ser ≥1.0.3
-- **Timestamp**: ISO 8601 UTC
-- **CRS**: Debe ser un código EPSG válido
-- **Transform**: Matriz de 6 elementos (affine transform)
+## 2. Python API Interface
 
-## Validación
+### 2.1 Class: `AgriculturalZoning`
 
-El PASCAL Zoning ML Block incluye validación automática de:
+Defined in `pascal_zoning/zoning.py`.
 
-1. Existencia y estructura del manifest.json
-2. Validación contra schema JSON
-3. Existencia de archivos de índices referenciados
-4. Consistencia de CRS entre índices
-5. Rangos de valores válidos
+#### Constructor Parameters
 
-## Manejo de Errores
+```python
+AgriculturalZoning(
+    random_state: Optional[int] = None,
+    min_zone_size_ha: float,
+    max_zones: int
+)
+```
 
-El bloque generará errores descriptivos cuando:
+#### Method: `run_pipeline`
 
-1. No encuentre manifest.json
-2. El manifest.json no valide contra el schema
-3. Falten índices requeridos (NDVI)
-4. Los índices tengan CRS inconsistentes
-5. Los valores estén fuera de rango
+```python
+ZoningResult = zoning.run_pipeline(
+    indices: Dict[str, np.ndarray],
+    bounds: shapely.geometry.Polygon,
+    points_per_zone: int,
+    crs: str,
+    force_k: Optional[int] = None,
+    use_pca: bool = False,
+    output_dir: Path
+)
+```
 
-## Logging y Trazabilidad
+* **`indices`**: Mapping from index name (e.g., `"NDVI"`) to its 2D NumPy array.
+* **`bounds`**: Field boundary polygon for masking.
+* **`points_per_zone`**: Number of sample points per zone.
+* **`crs`**: CRS string (e.g., `"EPSG:32719"`).
+* **`force_k`**: Override automatic cluster selection.
+* **`use_pca`**: Apply PCA for dimensionality reduction.
+* **`output_dir`**: Directory where outputs are saved.
 
-Siguiendo ISO 42001, se registran:
+#### Returns: `ZoningResult`
 
-1. Timestamp de inicio/fin
-2. Versiones de software
-3. Validaciones realizadas
-4. Errores encontrados
-5. Métricas de procesamiento
+The returned dataclass includes:
 
-## Soporte de Versiones
+* **`zones`**: `geopandas.GeoDataFrame` of zone polygons.
+* **`samples`**: `geopandas.GeoDataFrame` of sampling points.
+* **`metrics`**: `ClusterMetrics` with fields: `n_clusters`, `silhouette`, `calinski_harabasz`, `inertia`.
+* **`stats`**: List of `ZoneStats` with fields: `zone_id`, `area_ha`, `perimeter_m`, `compactness`, per-index mean & standard deviation.
 
-- **PASCAL NDVI Block**: ≥1.0.3
-- **Schemas**: 2025.1
-- **manifest.json**: v1
+---
 
-## Referencias
+## 3. Version & Compatibility
 
-- [PASCAL NDVI Block Documentation](https://github.com/australmetrics/pascal-ndvi-block)
-- [ISO 42001 Compliance](../compliance/iso42001_compliance.md)
-- [API Documentation](api_documentation.md)
+* **Repository Version**: Main (see `pyproject.toml`).
+* **Python Requirement**: ≥ 3.11.
+* **ISO Standard**: 42001.
+* **Dependencies**: See `requirements.txt`.
+
+---
+
+© 2025 AustralMetrics SpA. All rights reserved.
+

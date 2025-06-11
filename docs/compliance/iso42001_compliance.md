@@ -1,335 +1,157 @@
-# ISO 42001 Compliance
+# ISO 42001 Compliance Statement
 
-**Project**: Pascal Zoning ML  
-**Version**: 0.1.0-alpha  
-**Date**: 2025-06-05  
+> **Executive Summary**: This document maps ISO 42001:2023 requirements to the lifecycle of **Pascal Zoning ML**, covering governance, data management, risk controls, quality assurance, security, and auditing. It establishes traceability, transparency, and periodic review to support formal certification and continuous improvement.
 
----
+## Table of Contents
 
-## 1. Introduction
-
-This document demonstrates how **Pascal Zoning ML** adheres to the requirements of **ISO 42001: Artificial Intelligence Management System**. ISO 42001 provides a framework to ensure that AI‐powered applications are developed, deployed, and maintained in a transparent, secure, and ethically responsible manner. This compliance statement maps key ISO 42001 clauses to our project practices.
-
----
-
-## 2. Scope
-
-This compliance statement covers the following aspects of Pascal Zoning ML:
-
-- **Governance & Organizational Structure**  
-- **Documentation & Traceability**  
-- **Data Management & Privacy**  
-- **Risk Assessment & Mitigation**  
-- **Quality Assurance & Testing**  
-- **Security & Access Control**  
-- **Continuous Improvement & Auditing**
-
-It applies to both the **CLI pipeline** (`pascal_zoning.pipeline`) and the **Python API** (`AgriculturalZoning`), as well as supporting scripts, schemas, and tests included in this repository.
+1. [Introduction](#introduction)
+2. [Scope](#scope)
+3. [Normative References](#normative-references)
+4. [Governance & Organizational Structure](#governance--organizational-structure)
+5. [Documentation & Traceability](#documentation--traceability)
+6. [Data Management & Privacy](#data-management--privacy)
+7. [Risk Assessment & Mitigation](#risk-assessment--mitigation)
+8. [Quality Assurance & Testing](#quality-assurance--testing)
+9. [Security & Access Control](#security--access-control)
+10. [Continuous Improvement & Auditing](#continuous-improvement--auditing)
+11. [Change Tracking](#change-tracking)
+12. [Approval & Signatures](#approval--signatures)
 
 ---
 
-## 3. Normative References
+## Introduction
 
-- **ISO 42001:2023** – Artificial Intelligence Management System  
-- **ISO 9001:2015** – Quality Management Systems (for general process controls)  
-- **ISO 27001:2022** – Information Security Management System (for security controls)  
-- **GDPR** (General Data Protection Regulation) – Applicable privacy requirements  
-- **ISO/IEC 27018:2019** – Protection of Personally Identifiable Information (PII) in Public Clouds  
+This statement demonstrates how **Pascal Zoning ML** complies with **ISO 42001: Artificial Intelligence Management System**. It ensures transparent development, secure operations, and ethical use of AI for agricultural zoning.
 
----
+## Scope
 
-## 4. Governance & Organizational Structure
+Covers the CLI pipeline (`pascal_zoning.pipeline`), Python API (`AgriculturalZoning`), associated scripts, and documentation workflows.
 
-### 4.1 Roles and Responsibilities
+## Normative References
 
-- **Project Owner** (AustralMetrics SpA)  
-  - Ultimately responsible for ensuring compliance with ISO 42001.  
-  - Maintains the overall roadmap, product vision, and resource allocation.
+* ISO 42001:2023 — AI Management System Standard
+* ISO 9001:2015 — Quality Management Principles
+* ISO 27001:2022 — Information Security Management
+* ISO/IEC 27018:2019 — PII Protection in Cloud
+* GDPR — EU Data Protection Regulation
 
-- **Technical Lead / AI Engineer**  
-  - Owns the design and implementation of the zoning algorithms.  
-  - Ensures that coding best practices, version control, and documentation are followed.
+## Governance & Organizational Structure
 
-- **Quality Assurance (QA) Engineer**  
-  - Designs and executes unit, integration, and end-to-end tests.  
-  - Maintains test coverage thresholds and monitors automated CI pipelines.
+### Roles & Responsibilities
 
-- **Data Privacy Officer**  
-  - Reviews data sources (satellite imagery, shapefiles) for privacy compliance.  
-  - Confirms that no personally identifiable information (PII) is processed by the zoning pipeline.
+* **Project Owner**: AustralMetrics SpA — oversight, resource allocation, final sign‑off.
+* **Technical Lead / AI Engineer**: algorithm design, code reviews, documentation.
+* **QA Engineer**: test planning, CI pipelines, coverage monitoring.
+* **Data Privacy Officer**: data sourcing compliance, PII review.
+* **Security Officer**: access policies, secrets management.
 
-- **Security Officer**  
-  - Defines access policies for source code, test data, and deployment environments.  
-  - Manages secrets and credentials in accordance with ISO 27001 practices.
+### Policies & Procedures
 
-### 4.2 Policies and Procedures
+* **Change Management**: all `src/` updates via PR require peer review, impact analysis, and test updates.
+* **Release Management**: semantic versioning, tagged in Git, changelog maintained (`CHANGELOG.md`).
+* **AI Ethics Policy**: no PII ingestion; open‑source algorithms ensure reproducibility.
 
-- **AI Ethics Policy**  
-  - Pascal Zoning ML does not ingest any personal data.  
-  - All decisions (zoning, sampling recommendations) are transparent and reproducible from open‐source algorithms.
+## Documentation & Traceability
 
-- **Change Management**  
-  - All modifications to `src/` require a pull request (PR) with a review from at least one other AI Engineer.  
-  - PRs must include:  
-    - Summary of changes  
-    - Impact analysis (e.g., effect on existing zones, sampling outputs)  
-    - Updated or added tests demonstrating no regressions  
+### Requirements Traceability
 
-- **Release Management**  
-  - We follow **Semantic Versioning** (MAJOR.MINOR.PATCH).  
-  - Releases are tagged in Git; a CHANGELOG.md is maintained to record new features, bug fixes, and known issues.  
-  - A new version is published only after:  
-    1. All unit and integration tests pass on the `main` branch.  
-    2. A security scan (static analysis) completes with no critical vulnerabilities.  
-    3. Documentation (README, API reference, guides) is updated where necessary.
+Functional requirements recorded in `docs/interface_spec.md` and linked to test cases in `tests/`. Issue tracker enforces references between issues and requirements.
 
----
+### Versioned Artifacts
 
-## 5. Documentation & Traceability
+* Source code in Git: commit hashes, PRs, tags.
+* Deployment scripts (Dockerfiles) tagged alongside code.
+* Model artifacts (future): stored under `models/` with checksums.
 
-### 5.1 Requirements Traceability
+### Audit Trail & Logs
 
-- All functional requirements (e.g., “mask creation,” “optimal *k* selection,” “zone filtering”) are documented in `docs/interface_spec.md` and `docs/technical/functions_reference.md`.  
-- Each requirement is linked to one or more test cases (unit or integration).  
-- Issue tracker (GitHub Issues) enforces a policy: every new feature or bugfix must reference a corresponding issue, which in turn references affected requirements.
+* CLI runs produce timestamped logs at `outputs/<TIMESTAMP>_logs/processing.log`.
+* Logs record input parameters, warnings, errors, and summaries.
+* Archived logs retained in long‑term storage (e.g., S3) for at least 1 year.
 
-### 5.2 Versioned Artifacts
+## Data Management & Privacy
 
-- **Source Code**: Tracked in Git; commit hashes, pull requests, and release tags provide full history.  
-- **Docker / Deployment Scripts**: If used in production, a Dockerfile (or equivalent orchestration) is tagged with the same version as the code.  
-- **Model Parameters & Artifacts** (if any future extension to learnable models): Stored in a `models/` folder with a checksum and accompanying metadata file.
+### Data Sources & Lifecycle
 
-### 5.3 Logging & Audit Trail
+1. **Ingestion**: GeoTIFF and shapefiles supplied by user; geometry-only attributes retained.
+2. **Processing**: spectral indices stacked and filtered in memory.
+3. **Outputs**: GeoPackage (zones, points), CSV, JSON, and PNG; no PII included.
+4. **Retention**: intermediate data ephemeral; final outputs persist until user deletion.
 
-- All CLI runs (via `pascal_zoning.pipeline`) generate a timestamped log under `outputs/<TIMESTAMP>_k{K}_mz{MIN}/logs/processing.log`.  
-- Each log entry conforms to a standard format:  
-- Logs capture:  
-- Input parameters (raster path, indices, `--force-k`, `--min-zone-size`, etc.)  
-- Intermediate steps (masking counts, cluster metrics, zone counts)  
-- Warnings (e.g., “pixels dropped due to NaN values”)  
-- Errors (e.g., “No valid pixels found inside polygon”)  
-- Final summary (total execution time, number of zones generated, sample point counts)
+### Privacy Controls
 
-All logs are versioned if stored in a long‐term storage bucket (e.g., S3) or local archival folder.  
+* Drop non‑geometry fields on ingest.
+* No user‑level logs or IP tracking.
+* GDPR compliance relies on user‑provided consent for field boundary data.
 
----
+## Risk Assessment & Mitigation
 
-## 6. Data Management & Privacy
+### Identified Risks & Controls
 
-### 6.1 Data Sources
+| Risk                      | Mitigation                                                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Garbage‑in → Garbage‑out  | `_validate_indices()` enforces numeric, finite bounds; aborts on invalid inputs.                      |
+| Cluster Instability       | Evaluate silhouette & Calinski‑Harabasz over *k* range; fallback raises `ProcessingError` on failure. |
+| Zone Filtering Edge Cases | Defaults (`min_zone_size_ha=0.08`) validated; errors raised if thresholds invalid.                    |
+| Sampling Collisions       | Spatial inhibition adjusts points or raises errors to avoid silent failures.                          |
+| Malicious File Payloads   | Use up‑to‑date `rasterio` & `geopandas`; recommend Docker sandboxing with minimal privileges.         |
 
-- **Satellite Imagery** (GeoTIFF)  
-- Typically obtained from public repositories (e.g., Sentinel-2) or provided by the client.  
-- Contains only spectral bands; no personally identifiable information (PII).
+## Quality Assurance & Testing
 
-- **Field Boundaries** (Shapefile / GeoPackage)  
-- Provided as polygons (e.g., from cadastral databases).  
-- May contain owner metadata outside the pipeline; only the geometry is used internally.
+### Testing Strategy
 
-### 6.2 Data Lifecycle
+* **Unit Tests** (`tests/unit/`): each API method and helper.
+* **Integration Tests** (`tests/integration/`): synthetic GeoTIFF workflows.
+* **Coverage**: target ≥90%. Run `pytest --cov` to verify coverage.
 
-1. **Ingestion**  
- - User supplies a clipped GeoTIFF via `--raster` argument.  
- - Field polygon (Shapely `Polygon`) passed via API or derived from the first band of the TIFF.  
-
-2. **Processing**  
- - Pixel‐level operations (stacking spectral indices, filtering NaNs).  
- - No personal data is extracted or stored beyond geometric boundaries.
-
-3. **Storage**  
- - Generated outputs (GeoPackage, CSV, JSON, PNG) contain only:  
-   - Zone polygons (no PII)  
-   - Sampling point coordinates (no PII)  
-   - Per‐zone aggregate statistics (numerical values)  
- - Users must ensure that field boundaries themselves do not carry PII before passing them into the pipeline.
-
-4. **Deletion / Retention**  
- - By default, temporary intermediate arrays (e.g., masked numpy arrays) are not persisted on disk.  
- - Final outputs are retained indefinitely until manually removed by the user.  
- - The pipeline does not implement automatic deletion of old output folders; that behavior is delegated to external scheduler or retention policies.
-
-### 6.3 Privacy Measures
-
-- **No PII Usage**:  
-- Pascal Zoning ML never logs or writes owner names, addresses, or other personal attributes.  
-- Any shapefile or GeoPackage loaded at runtime is immediately cast to `geometry` type only; all non‐geometry attributes are dropped before processing.
-
-- **Data Minimization**:  
-- Only spectral index values and geometry features (polygons, points) are stored in outputs.  
-- Raw image bands (e.g., red, NIR, SWIR) exist only in memory during processing, unless the user explicitly passes those TIFFs to downstream storage.
-
-- **Compliance with GDPR** (if used in EU contexts):  
-- If a field boundary file contains PII, clients are responsible for obtaining proper consent.  
-- Pascal Zoning ML assumes data is supplied in a GDPR-compliant manner; it does not track IP addresses or user‐level logs.
-
----
-
-## 7. Risk Assessment & Mitigation
-
-### 7.1 Identified Risks
-
-1. **“Garbage In → Garbage Out”**  
- - Risk: If invalid/uncalibrated spectral indices are supplied, clustering results may be meaningless.  
- - Mitigation:  
-   - **Validation**: `_validate_indices()` (internal helper) checks that each index array is numeric, finite, and within expected bounds (–1 to 1 for NDVI/NDRE, etc.).  
-   - Early abort (raises `ValidationError`) if any index contains all NaN or values outside plausible range.
-
-2. **Cluster Instability**  
- - Risk: K-Means may fail to converge or find distinct clusters if data distribution is degenerate (e.g., all pixels identical).  
- - Mitigation:  
-   - Silhouette/Calinski-Harabasz evaluation over *k*=2‒`max_zones`.  
-   - If no valid *k* can be found (e.g., only one unique sample), fallback to raise a controlled `ProcessingError` rather than producing incorrect zones.
-
-3. **Zone Filtering Edge Cases**  
- - Risk: All zones get filtered out because minimum area threshold is too high.  
- - Mitigation:  
-   - Default `min_zone_size_ha=0.08` (≈ 800 m²) adequate for typical field sizes.  
-   - If user sets `--min-zone-size` larger than field area, pipeline raises `ProcessingError` with clear message:  
-     > “min_zone_size_ha (X) exceeds total field area (Y), no zones generated.”
+### CI/CD Pipeline
 
-4. **Sampling Point Collisions**  
- - Risk: Spatial inhibition algorithm unable to place `points_per_zone` if zone is too small.  
- - Mitigation:  
-   - Algorithm chooses max(`points_per_zone`, √N_pixels); if √N > N, simply uses all pixel centers.  
-   - If no sampling points can be generated, raises `ProcessingError` rather than returning silent empty results.
+1. Lint (`flake8`).
+2. Type‑check (`mypy`).
+3. Test (`pytest`).
+4. Security scan (`pip-audit`, `snyk`) quarterly.
 
-5. **Security: Malicious TIFF / Shapefile Contents**  
- - Risk: TIFF or shapefile contains malicious payloads or surprising coordinate systems.  
- - Mitigation:  
-   - **Dependency Patching**: Rely on up-to-date `rasterio`, `geopandas`, `shapely`.  
-   - **Sandboxing**: Encourage deployment inside isolated environment (Docker, virtualenv) with minimal privileges.  
-   - **Input Validation**: Confirm that CRS strings and affine transforms parse correctly; reject invalid geometries.
+## Security & Access Control
 
-### 7.2 Risk Owner & Actions
+### Repository Access
 
-- **Technical Lead** owns the risk registry within `docs/techdebt.md` and tracks mitigation tasks in GitHub Issues.  
-- **QA Engineer** verifies that unit/integration tests cover edge cases and that pipeline fails gracefully when encountering risk scenarios.  
-- **Security Officer** performs periodic dependency vulnerability scans (e.g., `pip-audit`, `Snyk`) and patches critical issues within 7 days.
+* Protected `main` branch: requires PR review, passing CI, no conflicts.
+* Signed commits enforced for release tags.
 
----
+### Secrets & Credentials
 
-## 8. Quality Assurance & Testing
+* No secrets in repo.
+* CI/CD tokens stored as encrypted GitHub Secrets.
 
-### 8.1 Testing Strategy
+### Runtime Security
 
-- **Unit Tests** (`tests/unit/`)  
-- Cover each public method:  
-  - `create_mask()` → boolean mask validation.  
-  - `prepare_feature_matrix()` → imputation + scaling.  
-  - `perform_clustering()` → correct cluster count and metrics.  
-  - `extract_zone_polygons()` → correct polygon generation.  
-  - `filter_small_zones()` → area threshold enforcement.  
-  - `generate_sampling_points()` → spatial inhibition guarantee.  
-  - `compute_zone_statistics()` → metrics (area_ha, compactness, mean/std).  
-- Assert `ProcessingError` or `ValidationError` in failure modes.
+* Recommend Docker for sandboxing; restrict network egress.
+* Enforce type checks with `mypy` & `pyright` configs.
 
-- **Integration Tests** (`tests/integration/`)  
-- Create a small synthetic multi‐band GeoTIFF, run the full CLI pipeline, and assert that:  
-  - CLI exits with code 0.  
-  - All expected output files (`.gpkg`, `.csv`, `.json`, `.png`) appear.  
-  - Produced zone counts and sample points are reasonable given synthetic data.
+## Continuous Improvement & Auditing
 
-- **Visual Tests** (manual/optional)  
-- Inspect PNG outputs for correct coloring, mask boundaries, and bar charts.  
-- Ensure that a CLI invocation with `--use-pca` does not crash.
+### Audit Schedule
 
-### 8.2 Test Coverage & Reporting
+* **Annual Internal Audit**: governance, risk, tests, logs.
+* **Quarterly Security Scan**: documented in Issues; critical fixes within 14 days.
+* **External Pen Test**: optional third‑party at least bi‑annual.
 
-- **Coverage Target**: ≥ 90% line coverage on `src/pascal_zoning/`.  
-- **Continuous Integration (CI)**:  
-- GitHub Actions pipeline runs on every PR:  
-  1. `pytest --maxfail=1 --disable-warnings -q`  
-  2. `flake8 src/` (no lint errors)  
-  3. `mypy src/` (no type‐checking errors except those explicitly disabled)  
-- Artifacts (test reports, coverage badges) are published to a central dashboard (e.g., Codecov).
+### Version Review
 
----
+* Compliance document reviewed and signed annually (next: 2026‑06‑05).
 
-## 9. Security & Access Control
+## Change Tracking
 
-### 9.1 Repository Access
+Refer to [`CHANGELOG.md`](CHANGELOG.md) for full history of features, fixes, and breaking changes.
 
-- **GitHub Organization**: AustralMetrics SpA  
-- **Branch Protection**:  
-- `main` branch requires at least one approving code review, passing CI checks, and no merge conflicts.  
-- Use “signed commits” policy for tagged releases (GPG key of Project Owner).
+## Approval & Signatures
 
-- **Dependency Management**  
-- All dependencies pinned in `requirements.txt` with explicit version numbers.  
-- `requirements-dev.txt` pins linters, test frameworks, and MyPy plugin versions.  
-- Periodic review (monthly) of PyPI for available security patches.
+| Role                         | Name / Signature   | Date       |
+| ---------------------------- | ------------------ | ---------- |
+| Project Owner                |                    |            |
+| Technical Lead / AI Engineer | Robinson Messenger | 2025-06-10 |
+| QA Engineer                  |                    |            |
+| Data Privacy Officer         |                    |            |
+| Security Officer             |                    |            |
 
-### 9.2 Secrets & Credentials
-
-- **No Secrets in Repo**:  
-- Credentials (e.g., cloud keys, database passwords) never stored in source.  
-- Use environment variables or a separate secrets manager (e.g., AWS Secrets Manager, Azure Key Vault).
-
-- **CI/CD Pipeline**:  
-- Secrets for publishing coverage reports or PyPI tokens stored as encrypted GitHub Secrets.  
-- Only exposed to the GitHub Actions workflow when building a tagged release.
-
-### 9.3 Runtime Security
-
-- **Sandboxed Execution**:  
-- If deployed in production, run CLI within a Docker container with restricted filesystem permissions.  
-- Limit network egress unless explicitly needed.
-
-- **Library Stubs & Type Checking**  
-- Use `pyrightconfig.json` and `mypy.ini` to enforce proper typing on all Python modules under `src/pascal_zoning/`.  
-- Missing type stubs for third-party packages (e.g., `sklearn`, `rasterio`, `geopandas`) are configured to ignore import errors, but critical portions of our own code require fully typed functions (`disallow_untyped_defs`, etc.).
-
----
-
-## 10. Continuous Improvement & Auditing
-
-### 10.1 Internal Audits
-
-- **Annual ISO 42001 Audit**  
-- Review governance documents, risk register, test coverage, and production logs.  
-- Verify that new features introduced in the previous 12 months had corresponding risk assessments and tests.
-
-- **Quarterly Security Scan**  
-- Run `pip-audit` and `snyk` in CI to detect new vulnerabilities in dependencies.  
-- Document findings in GitHub Issues; fix “critical” or “high” severity within 14 days.
-
-- **Code Review Metrics**  
-- Track average time to approve PRs, number of reverts, and # of security findings.  
-- Identify bottlenecks in release pipeline and adjust team processes accordingly.
-
-### 10.2 External Audits & Certifications
-
-- **Third-Party Penetration Test** (Optional)  
-- Engage an external security firm to attempt to exploit the CLI or API in a sandboxed environment.  
-- Publish the high-level findings without revealing sensitive code details.
-
-- **ISO 42001 Certification** (Future)  
-- Maintain this compliance document as living evidence for any upcoming formal ISO 42001 certification.  
-- Plan to perform gap analysis vs. full ISO 42001 checklist in Q4 2025 and remediate any nonconformities.
-
----
-
-## 11. Change Tracking
-
-See `CHANGELOG.md` for a chronological listing of all changes, including:
-
-- New feature additions (e.g., “Add `--use-pca` flag,” “Support for NDWI index”)  
-- Bug fixes (e.g., “Fix sampling algorithm when zone contains fewer pixels than requested”)  
-- Dependency upgrades (e.g., “Upgrade `geopandas` from 0.14.0 to 0.14.2 to patch CVE-XXXX-YYYY”)  
-- Breaking changes (e.g., “Renamed `ClusterMetrics.cluster_sizes` keys from `int64` → `int`)  
-
----
-
-## 12. Approval & Signatures
-
-| Role                          | Name / Signature         | Date       |
-|-------------------------------|--------------------------|------------|
-| Project Owner                 | _______________________  | YYYY-MM-DD |
-| Technical Lead / AI Engineer  | _______________________  | YYYY-MM-DD |
-| QA Engineer                   | _______________________  | YYYY-MM-DD |
-| Data Privacy Officer          | _______________________  | YYYY-MM-DD |
-| Security Officer              | _______________________  | YYYY-MM-DD |
-
-> *This ISO 42001 compliance statement is valid until the next formal review date (2026-06-05).*
-
----
+*Document version: 2025-06-10 v1.0.2*
